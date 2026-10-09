@@ -1,0 +1,41 @@
+# Team 06 - Smart Parking Management System (SPMS)
+# CI workflow: runs automated tests on every pull request to main and every push to main.
+# Location must be: .github/workflows/ci.yml  (this is how GitHub Actions finds it)
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/workflows/ci.yml"
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - ".github/workflows/ci.yml"
+
+jobs:
+  test:                      # <- this job name "test" is the status check required by the "Protect main" ruleset
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install requirements
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          # exit code 5 = "no tests collected" (repo is still empty) -> treat as pass for now
+          pytest -v || [ $? -eq 5 ]
