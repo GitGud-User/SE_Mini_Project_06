@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Admin</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>Admin: lots, levels and slots</h1>
+  <div class="row">
+    <form class="card" id="lotForm">
+      <h2>New parking lot</h2>
+      <label for="lname">Name</label><input id="lname" required>
+      <label for="laddr">Address</label><input id="laddr">
+      <button type="submit">Create lot</button>
+      <div class="msg" id="lotMsg"></div>
+    </form>
+    <form class="card" id="levelForm">
+      <h2>Add level</h2>
+      <label for="lot">Lot</label><select id="lot"></select>
+      <label for="floor">Floor number</label><input id="floor" type="number" value="0" required>
+      <label for="lvname">Level name</label><input id="lvname" value="Ground" required>
+      <button type="submit">Add level</button>
+      <div class="msg" id="levelMsg"></div>
+    </form>
+    <form class="card" id="slotForm">
+      <h2>Add slots</h2>
+      <label for="level">Level</label><select id="level"></select>
+      <label for="stype">Slot type</label>
+      <select id="stype">
+        <option value="FOUR_WHEELER">Car</option><option value="TWO_WHEELER">Two-wheeler</option>
+        <option value="EV">EV</option><option value="ACCESSIBLE">Accessible</option>
+      </select>
+      <div class="row">
+        <div><label for="count">How many</label><input id="count" type="number" value="5" min="1" required></div>
+        <div><label for="prefix">Code prefix</label><input id="prefix" value="A" required></div>
+      </div>
+      <button type="submit">Add slots</button>
+      <div class="msg" id="slotMsg"></div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Slots in this lot</h2>
+    <p class="muted">Click a slot's button to put it under maintenance or bring it back.</p>
+    <div class="slots" id="slots"></div>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+if (SPMS.requireRole(["ADMIN"])) {
+  SPMS.header("admin.html");
+  const lotSel = document.getElementById("lot"), levelSel = document.getElementById("level");
+
+  async function loadLots(selectId) {
+    await SPMS.fillLots(lotSel);
+    if (selectId) lotSel.value = selectId;
+    await loadLot();
+  }
+  async function loadLot() {
+    if (!lotSel.value) { levelSel.innerHTML = ""; document.getElementById("slots").innerHTML = ""; return; }
+    const levels = await SPMS.api(`/api/v1/lots/${lotSel.value}/levels`);
+    levelSel.innerHTML = levels.map(l => `<option value="${l.id}">${l.name} (floor ${l.floor_no})</option>`).join("");
+    const slots = await SPMS.api(`/api/v1/lots/${lotSel.value}/slots`);
+    document.getElementById("slots").innerHTML = slots.map(s => `<div class="slot"><b>${s.code}</b>${s.slot_type.replace("_", " ")}<br>
+      <span class="pill ${s.status}">${s.status}</span><br>
+      <button type="button" class="secondary" data-id="${s.id}" data-m="${s.status !== "MAINTENANCE"}">${s.status === "MAINTENANCE" ? "Reopen" : "Maintenance"}</button></div>`).join("")
+      || `<p class="muted">No slots yet.</p>`;
+  }
+  lotSel.onchange = loadLot;
+  document.getElementById("slots").onclick = async (e) => {
+    const b = e.target.closest("button[data-id]");
+    if (!b) return;
+    try {
+      await SPMS.api(`/api/v1/slots/${b.dataset.id}/maintenance`, { method: "PATCH",
+        body: JSON.stringify({ under_maintenance: b.dataset.m === "true" }) });
+      loadLot();
+    } catch (err) { alert(err.message); }
+  };
+
+  document.getElementById("lotForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("lotMsg");
+    try {
+      const lot = await SPMS.api("/api/v1/lots", { method: "POST", body: JSON.stringify({
+        name: document.getElementById("lname").value, address: document.getElementById("laddr").value }) });
+      SPMS.show(msg, `Created "${lot.name}"`, true); e.target.reset(); loadLots(lot.id);
+    } catch (err) { SPMS.show(msg, err.message, false); }
+  };
+  document.getElementById("levelForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("levelMsg");
+    try {
+      await SPMS.api(`/api/v1/lots/${lotSel.value}/levels`, { method: "POST", body: JSON.stringify({
+        floor_no: Number(document.getElementById("floor").value), name: document.getElementById("lvname").value }) });
+      SPMS.show(msg, "Level added", true); loadLot();
+    } catch (err) { SPMS.show(msg, err.message, false); }
+  };
+  document.getElementById("slotForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("slotMsg");
+    try {
+      const made = await SPMS.api(`/api/v1/lots/${lotSel.value}/slots`, { method: "POST", body: JSON.stringify({
+        level_id: Number(levelSel.value), slot_type: document.getElementById("stype").value,
+        count: Number(document.getElementById("count").value), prefix: document.getElementById("prefix").value }) });
+      SPMS.show(msg, `Added ${made.length} slots (${made[0].code} … ${made[made.length - 1].code})`, true); loadLot();
+    } catch (err) { SPMS.show(msg, err.message, false); }
+  };
+  loadLots();
+}
+</script>
+</body>
+</html>

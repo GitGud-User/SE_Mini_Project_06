@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Live availability</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>Live parking availability</h1>
+  <div class="card">
+    <label for="lot">Parking lot</label>
+    <select id="lot"></select>
+    <p class="muted" id="status">Connecting…</p>
+  </div>
+  <div class="grid" id="types"></div>
+  <div class="card" style="margin-top:18px">
+    <h2>By level</h2>
+    <table><thead><tr><th>Level</th><th>Free</th><th>Total</th></tr></thead><tbody id="levels"></tbody></table>
+    <p class="muted" id="occ"></p>
+  </div>
+  <p class="muted" id="empty" style="display:none">No parking lots yet. An admin can add one on the Admin page, or run <code>python -m backend.seed</code>.</p>
+</main>
+<script src="app.js"></script>
+<script>
+SPMS.header("index.html");
+const LABELS = { TWO_WHEELER: "Two-wheeler", FOUR_WHEELER: "Car", EV: "EV charging", ACCESSIBLE: "Accessible" };
+const sel = document.getElementById("lot");
+let ws = null, pollTimer = null;
+
+function render(s) {
+  document.getElementById("types").innerHTML = Object.entries(s.free_by_type).map(([t, n]) =>
+    `<div class="stat"><div class="label">${LABELS[t] || t}</div><div class="value ${n === 0 ? "zero" : ""}" data-type="${t}">${n}</div></div>`).join("");
+  document.getElementById("levels").innerHTML = s.levels.map(l =>
+    `<tr><td>${l.level}</td><td>${l.free}</td><td>${l.total}</td></tr>`).join("");
+  document.getElementById("occ").textContent = `Occupancy ${s.occupancy_percent}% · ${s.total_free} of ${s.total_slots} slots free`;
+  document.getElementById("status").textContent = "Updated " + new Date().toLocaleTimeString() + (ws ? " (live)" : " (polling)");
+}
+
+function startPolling(id) {
+  const tick = () => SPMS.api(`/api/v1/lots/${id}/availability`).then(render).catch(() => {});
+  tick();
+  pollTimer = setInterval(tick, 5000);
+}
+
+function watch(id) {
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  clearInterval(pollTimer);
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  try {
+    ws = new WebSocket(`${proto}://${location.host}/ws/lots/${id}/availability`);
+    ws.onmessage = (e) => { const d = JSON.parse(e.data); if (!d.error) render(d); };
+    ws.onclose = () => { ws = null; startPolling(id); };
+  } catch { ws = null; startPolling(id); }
+}
+
+SPMS.fillLots(sel).then(lots => {
+  if (!lots.length) { document.getElementById("empty").style.display = "block"; document.getElementById("status").textContent = ""; return; }
+  watch(sel.value);
+});
+sel.onchange = () => watch(sel.value);
+</script>
+</body>
+</html>
