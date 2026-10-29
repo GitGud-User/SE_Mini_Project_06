@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Gate</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>Gate console</h1>
+  <div class="row">
+    <form class="card" id="entryForm">
+      <h2>Vehicle entry</h2>
+      <label for="lot">Lot</label><select id="lot"></select>
+      <label for="plate">Number plate</label><input id="plate" placeholder="KA01AB1234" required>
+      <label for="vtype">Vehicle type</label>
+      <select id="vtype">
+        <option value="FOUR_WHEELER">Car</option><option value="TWO_WHEELER">Two-wheeler</option>
+        <option value="EV">EV</option><option value="ACCESSIBLE">Accessible</option>
+      </select>
+      <label for="qr">Reservation QR (optional)</label><input id="qr">
+      <button type="submit">Log entry</button>
+      <div class="msg" id="entryMsg"></div>
+    </form>
+    <form class="card" id="exitForm">
+      <h2>Vehicle exit</h2>
+      <label for="xplate">Number plate</label><input id="xplate" placeholder="KA01AB1234" required>
+      <button type="submit">Log exit &amp; compute fee</button>
+      <div class="msg" id="exitMsg"></div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Vehicles inside</h2>
+    <table><thead><tr><th>Ticket</th><th>Plate</th><th>Type</th><th>Slot</th><th>Entered (UTC)</th></tr></thead><tbody id="open"></tbody></table>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+if (SPMS.requireRole(["ATTENDANT", "ADMIN"])) {
+  SPMS.header("gate.html");
+  const lotSel = document.getElementById("lot");
+  SPMS.fillLots(lotSel).then(refresh);
+
+  async function refresh() {
+    const rows = await SPMS.api(`/api/v1/gate/sessions?only_open=true`);
+    document.getElementById("open").innerHTML = rows.map(s =>
+      `<tr><td>${s.ticket}</td><td>${s.plate}</td><td>${s.vehicle_type}</td><td>${s.slot_code}</td><td>${s.entry_time.replace("T", " ").slice(0, 16)}</td></tr>`).join("")
+      || `<tr><td colspan="5" class="muted">No vehicles inside.</td></tr>`;
+  }
+
+  document.getElementById("entryForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("entryMsg");
+    const body = { lot_id: Number(lotSel.value), plate: document.getElementById("plate").value,
+                   vehicle_type: document.getElementById("vtype").value };
+    const qr = document.getElementById("qr").value.trim();
+    if (qr) body.reservation_qr = qr;
+    try {
+      const s = await SPMS.api("/api/v1/gate/entry", { method: "POST", body: JSON.stringify(body) });
+      SPMS.show(msg, `Ticket ${s.ticket}: park ${s.plate} in slot ${s.slot_code}`, true);
+      e.target.reset(); refresh();
+    } catch (err) { SPMS.show(msg, err.message, false); }
+  };
+
+  document.getElementById("exitForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("exitMsg");
+    try {
+      const s = await SPMS.api("/api/v1/gate/exit", { method: "POST",
+        body: JSON.stringify({ plate: document.getElementById("xplate").value }) });
+      SPMS.show(msg, `${s.plate}: ${s.minutes} min parked · Fee ₹${s.fee.toFixed(2)}`, true);
+      e.target.reset(); refresh();
+    } catch (err) { SPMS.show(msg, err.message, false); }
+  };
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+# Team 06 - SPMS: small automation for pull requests.
+# When a PR is opened it is assigned to its author and labelled from the branch name:
+#   feature/...  -> feature        docs/...  -> documentation
+#   fix/...      -> bug            test/...  -> testing
+# The "Closes #N" lines in the PR description link it to backlog issues on the project board.
+
+name: PR automation
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  issues: write
+
+jobs:
+  triage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assign author and add label
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const branch = pr.head.ref;
+            const rules = { "feature/": "feature", "docs/": "documentation", "fix/": "bug", "test/": "testing" };
+            const label = Object.entries(rules).find(([prefix]) => branch.startsWith(prefix))?.[1];
+
+            await github.rest.issues.addAssignees({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: pr.number, assignees: [pr.user.login],
+            });
+            if (label) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: pr.number, labels: [label],
+              });
+            }
+            if (!/(close[sd]?|fix(e[sd])?|resolve[sd]?) #\d+/i.test(pr.body || "")) {
+              core.warning("PR description has no 'Closes #N' line - the backlog card will not move to Done automatically.");
+            }
+            core.info(`Assigned ${pr.user.login}; label: ${label || "none"}`);

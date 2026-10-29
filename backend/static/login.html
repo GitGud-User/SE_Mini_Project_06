@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Log in</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <div class="row">
+    <form class="card" id="loginForm">
+      <h2>Log in</h2>
+      <label for="email">Email</label><input id="email" type="email" required>
+      <label for="password">Password</label><input id="password" type="password" required>
+      <button type="submit">Log in</button>
+      <div class="msg" id="loginMsg"></div>
+      <p class="muted">Demo: admin@spms.local / admin123 · attendant@spms.local / attend123</p>
+    </form>
+    <form class="card" id="regForm">
+      <h2>New driver? Register</h2>
+      <label for="rname">Name</label><input id="rname" required>
+      <label for="remail">Email</label><input id="remail" type="email" required>
+      <label for="rphone">Phone (10 digits)</label><input id="rphone" required>
+      <label for="rpass">Password (min 6)</label><input id="rpass" type="password" required>
+      <button type="submit">Register</button>
+      <div class="msg" id="regMsg"></div>
+    </form>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+SPMS.header("login.html");
+const HOME = { ADMIN: "admin.html", ATTENDANT: "gate.html", DRIVER: "index.html" };
+document.getElementById("loginForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("loginMsg");
+  try {
+    const data = await SPMS.api("/api/v1/auth/login", { method: "POST", body: JSON.stringify({
+      email: document.getElementById("email").value, password: document.getElementById("password").value }) });
+    SPMS.saveLogin(data);
+    const next = new URLSearchParams(location.search).get("next");
+    location.href = next || HOME[data.role] || "index.html";
+  } catch (err) { SPMS.show(msg, err.message, false); }
+};
+document.getElementById("regForm").onsubmit = async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("regMsg");
+  try {
+    await SPMS.api("/api/v1/auth/register", { method: "POST", body: JSON.stringify({
+      name: document.getElementById("rname").value, email: document.getElementById("remail").value,
+      phone: document.getElementById("rphone").value, password: document.getElementById("rpass").value }) });
+    SPMS.show(msg, "Registered! You can log in now.", true);
+  } catch (err) { SPMS.show(msg, err.message, false); }
+};
+</script>
+</body>
+</html>
