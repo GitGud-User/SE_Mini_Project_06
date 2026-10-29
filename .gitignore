@@ -23,3 +23,6 @@ frontend/build/
 .idea/
 .DS_Store
 Thumbs.db
+
+# local SQLite databases
+*.db
