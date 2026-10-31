@@ -13,6 +13,8 @@ const SPMS = {
     } catch { /* storage blocked: login lasts for this page only */ }
   },
   logout() {
+    const t = SPMS.token();  // SR-003: revoke the token on the server too
+    if (t) fetch("/api/v1/auth/logout", { method: "POST", headers: { Authorization: "Bearer " + t } }).catch(() => {});
     try { localStorage.removeItem("spms_token"); localStorage.removeItem("spms_user"); } catch {}
     location.href = "login.html";
   },

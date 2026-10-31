@@ -9,13 +9,14 @@ os.environ["SPMS_BCRYPT_ROUNDS"] = "4"  # fast hashing in tests only
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend import auth  # noqa: E402
+from backend import auth, ratelimit  # noqa: E402
 from backend.db import Base, SessionLocal, engine  # noqa: E402
 from backend.main import app  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def fresh_db():
+    ratelimit.reset()  # SR-006 counters start fresh for every test
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     with SessionLocal() as db:

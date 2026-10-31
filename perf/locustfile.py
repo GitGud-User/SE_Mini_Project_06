@@ -30,10 +30,13 @@ class Driver(HttpUser):
 
 class Attendant(HttpUser):
     wait_time = between(2, 5)
+    token = None  # shared: login is rate-limited to 10/min per IP (SR-006), so log in once for all users
 
     def on_start(self):
-        r = self.client.post("/api/v1/auth/login", json={"email": "attendant@spms.local", "password": "attend123"})
-        self.headers = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        if Attendant.token is None:
+            r = self.client.post("/api/v1/auth/login", json={"email": "attendant@spms.local", "password": "attend123"})
+            Attendant.token = r.json()["access_token"]
+        self.headers = {"Authorization": f"Bearer {Attendant.token}"}
 
     @task
     def gate_cycle(self):
