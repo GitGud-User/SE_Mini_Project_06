@@ -14,11 +14,11 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from backend import auth
+from backend import auth, reservations
 from backend.auth import ADMIN, ATTENDANT, require_roles
 from backend.billing import compute_fee
 from backend.db import Base, get_db
-from backend.lots import FREE, OCCUPIED, SLOT_TYPES, Slot, find_best_free_slot, get_lot_or_404, get_tariff
+from backend.lots import FREE, OCCUPIED, SLOT_TYPES, Slot, get_lot_or_404, get_tariff
 
 OPEN, CLOSED = "OPEN", "CLOSED"
 QR_WINDOW_MINUTES = 15
@@ -100,10 +100,11 @@ def _session_out(db: Session, s: ParkingSession) -> SessionOut:
 
 
 # ---------- reservation QR (F-053) ----------
-def make_reservation_qr(lot_id: int, plate: str, start: dt.datetime, slot_id: int | None = None) -> str:
-    """Signed QR payload for a reservation. Sprint 2's reservation module will call this."""
+def make_reservation_qr(lot_id: int, plate: str, start: dt.datetime, slot_id: int | None = None,
+                        reservation_id: int | None = None) -> str:
+    """Signed QR payload for a reservation (issued by backend/reservations.py)."""
     payload = {"kind": "reservation", "lot": lot_id, "plate": _clean_plate(plate),
-               "start": start.isoformat(), "slot": slot_id}
+               "start": start.isoformat(), "slot": slot_id, "res": reservation_id}
     return jwt.encode(payload, auth.SECRET_KEY, algorithm=auth.ALGORITHM)
 
 
@@ -137,23 +138,34 @@ def vehicle_entry(data: EntryIn, db: Session = Depends(get_db)):
     if db.scalar(select(ParkingSession).where(ParkingSession.plate == data.plate, ParkingSession.status == OPEN)):
         raise HTTPException(status.HTTP_409_CONFLICT, "This vehicle is already inside")
 
-    slot = None
-    if data.reservation_qr:
-        qr = validate_reservation_qr(data.reservation_qr, lot.id, data.plate)
-        if qr.get("slot"):
-            slot = db.get(Slot, qr["slot"])
-    if slot is None or slot.status not in (FREE, "RESERVED"):
-        slot = find_best_free_slot(db, lot.id, data.vehicle_type)
-    if slot is None:
-        raise HTTPException(status.HTTP_409_CONFLICT, f"Lot is full for {data.vehicle_type}")
+    now = _now()
+    reservation, slot, vehicle_type = None, None, data.vehicle_type
+    with reservations.ALLOC_LOCK:  # same lock as reservations: no two cars can get one slot (F-031)
+        if data.reservation_qr:
+            qr = validate_reservation_qr(data.reservation_qr, lot.id, data.plate)
+            if qr.get("res"):  # Sprint 2 reservation: check in and use the reserved slot
+                reservation = reservations.check_in(db, qr["res"])
+                vehicle_type = reservation.vehicle_type
+                slot = db.get(Slot, reservation.slot_id)
+            elif qr.get("slot"):
+                slot = db.get(Slot, qr["slot"])
+            if slot is not None and slot.status != FREE:
+                slot = None
+        if slot is None:  # F-040: nearest compatible slot that is not reserved within the next hour
+            slot = reservations.allocate_walk_in(db, lot.id, vehicle_type, now)
+        if slot is None:
+            raise HTTPException(status.HTTP_409_CONFLICT, f"Lot is full for {vehicle_type}")
 
-    slot.status = OCCUPIED
-    session = ParkingSession(lot_id=lot.id, slot_id=slot.id, plate=data.plate,
-                             vehicle_type=data.vehicle_type, entry_time=_now(), status=OPEN)
-    db.add(session)
-    db.flush()
-    session.ticket = f"T-{session.id:06d}"
-    db.commit()
+        slot.status = OCCUPIED
+        session = ParkingSession(lot_id=lot.id, slot_id=slot.id, plate=data.plate,
+                                 vehicle_type=vehicle_type, entry_time=now, status=OPEN)
+        db.add(session)
+        db.flush()
+        session.ticket = f"T-{session.id:06d}"
+        if reservation is not None:
+            reservation.status = reservations.CHECKED_IN
+            reservation.session_ticket = session.ticket
+        db.commit()
     return _session_out(db, session)
 
 
@@ -172,6 +184,7 @@ def vehicle_exit(data: ExitIn, db: Session = Depends(get_db)):
     slot = db.get(Slot, session.slot_id)
     if slot is not None:
         slot.status = FREE
+    reservations.complete_for_ticket(db, session.ticket)
     db.commit()
     return _session_out(db, session)
 

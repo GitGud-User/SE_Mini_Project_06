@@ -10,9 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.availability import count_free_slots, occupancy_percent
-from backend.auth import utcnow
+from backend import auth
 from backend.db import SessionLocal, get_db
 from backend.lots import SLOT_TYPES, Level, Slot, get_lot_or_404
+from backend.reservations import held_slot_ids
 
 PUSH_INTERVAL_SECONDS = 2
 
@@ -21,7 +22,9 @@ def build_snapshot(db: Session, lot_id: int) -> dict:
     """Free-slot counts per type and per level, plus occupancy, for one lot."""
     lot = get_lot_or_404(db, lot_id)
     slots = db.scalars(select(Slot).where(Slot.lot_id == lot_id)).all()
-    as_dicts = [{"code": s.code, "type": s.slot_type, "status": s.status, "level_id": s.level_id} for s in slots]
+    held = held_slot_ids(db, lot_id, auth.utcnow())  # reserved cars arriving now: show those slots as RESERVED
+    as_dicts = [{"code": s.code, "type": s.slot_type, "level_id": s.level_id,
+                 "status": "RESERVED" if s.status == "FREE" and s.id in held else s.status} for s in slots]
     free = count_free_slots(as_dicts)
     levels = db.scalars(select(Level).where(Level.lot_id == lot_id).order_by(Level.floor_no)).all()
     per_level = []
@@ -37,7 +40,7 @@ def build_snapshot(db: Session, lot_id: int) -> dict:
         "total_slots": len(as_dicts),
         "occupancy_percent": occupancy_percent(as_dicts),
         "levels": per_level,
-        "updated_at": utcnow().isoformat(timespec="seconds") + "Z",
+        "updated_at": auth.utcnow().isoformat(timespec="seconds") + "Z",
     }
 
 
