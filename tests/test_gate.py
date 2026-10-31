@@ -67,10 +67,16 @@ def test_driver_cannot_use_gate(client, driver_headers, lot):
 def test_exit_computes_fee_and_frees_slot(client, attendant_headers, lot, clock):  # TC-GATE-03 + TC-BILL-01
     enter(client, attendant_headers, lot)
     clock["now"] = T0 + dt.timedelta(minutes=125)  # 2h05m -> 3 started hours x 30
+    blocked = client.post("/api/v1/gate/exit", json={"plate": "KA01AB1234"}, headers=attendant_headers)
+    assert blocked.status_code == 402  # F-063: unpaid fee blocks the exit
+    due = client.get("/api/v1/payments/due?plate=KA01AB1234", headers=attendant_headers).json()
+    assert due["amount_due"] == 90.0
+    client.post("/api/v1/payments/cash", json={"ticket": due["ticket"], "amount": 90}, headers=attendant_headers)
     response = client.post("/api/v1/gate/exit", json={"plate": "KA01AB1234"}, headers=attendant_headers)
     assert response.status_code == 200
     body = response.json()
     assert body["minutes"] == 125 and body["fee"] == 90.0 and body["status"] == "CLOSED"
+    assert body["receipt_no"] == "RCPT-000001"
     assert client.get(f"/api/v1/lots/{lot['id']}/slots").json()[0]["status"] == "FREE"
 
 

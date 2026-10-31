@@ -26,9 +26,19 @@ const SPMS = {
     if (!res.ok) {
       let detail = body && body.detail;
       if (Array.isArray(detail)) detail = detail.map(d => d.msg).join("; ");
-      throw new Error(detail || ("Request failed (" + res.status + ")"));
+      const error = new Error(detail || ("Request failed (" + res.status + ")"));
+      error.status = res.status;
+      throw error;
     }
     return body;
+  },
+  // Download a file from an authenticated endpoint (e.g. a receipt PDF).
+  async download(path, filename) {
+    const res = await fetch(path, { headers: { Authorization: "Bearer " + SPMS.token() } });
+    if (!res.ok) throw new Error("Download failed (" + res.status + ")");
+    const url = URL.createObjectURL(await res.blob());
+    const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   },
   show(el, text, ok) { el.textContent = text; el.className = "msg " + (ok ? "ok" : "err"); },
   requireRole(roles) {

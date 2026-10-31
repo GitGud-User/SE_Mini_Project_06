@@ -16,9 +16,8 @@ from sqlalchemy.orm import Mapped, Session, mapped_column
 
 from backend import auth, reservations
 from backend.auth import ADMIN, ATTENDANT, require_roles
-from backend.billing import compute_fee
 from backend.db import Base, get_db
-from backend.lots import FREE, OCCUPIED, SLOT_TYPES, Slot, get_lot_or_404, get_tariff
+from backend.lots import FREE, OCCUPIED, SLOT_TYPES, Slot, get_lot_or_404
 
 OPEN, CLOSED = "OPEN", "CLOSED"
 QR_WINDOW_MINUTES = 15
@@ -87,16 +86,17 @@ class SessionOut(BaseModel):
     minutes: int | None
     fee: float | None
     status: str
+    receipt_no: str | None = None
 
 
-def _session_out(db: Session, s: ParkingSession) -> SessionOut:
+def _session_out(db: Session, s: ParkingSession, receipt_no: str | None = None) -> SessionOut:
     slot = db.get(Slot, s.slot_id)
     minutes = None
     if s.exit_time is not None:
         minutes = math.ceil((s.exit_time - s.entry_time).total_seconds() / 60)
     return SessionOut(ticket=s.ticket, lot_id=s.lot_id, slot_code=slot.code if slot else "?", plate=s.plate,
                       vehicle_type=s.vehicle_type, entry_time=s.entry_time, exit_time=s.exit_time,
-                      minutes=minutes, fee=s.fee, status=s.status)
+                      minutes=minutes, fee=s.fee, status=s.status, receipt_no=receipt_no)
 
 
 # ---------- reservation QR (F-053) ----------
@@ -171,22 +171,24 @@ def vehicle_entry(data: EntryIn, db: Session = Depends(get_db)):
 
 @router.post("/exit", response_model=SessionOut, dependencies=[Depends(staff)])
 def vehicle_exit(data: ExitIn, db: Session = Depends(get_db)):
-    """SPMS-F-052/F-060: log exit, compute the fee with the lot tariff and free the slot."""
+    """SPMS-F-052/F-060/F-063: log exit. The fee (lot tariff minus any reservation advance) must be paid
+    or waived first - otherwise 402 Payment Required. Frees the slot and issues the receipt (F-062)."""
+    from backend import payments  # payments imports this module, so import lazily
+
     session = db.scalar(select(ParkingSession).where(ParkingSession.plate == data.plate,
                                                      ParkingSession.status == OPEN))
     if session is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "No open parking session for this vehicle")
-    session.exit_time = _now()
-    minutes = math.ceil((session.exit_time - session.entry_time).total_seconds() / 60)
-    tariff = get_tariff(db, session.lot_id, session.vehicle_type)
-    session.fee = compute_fee(minutes, tariff.hourly_rate, tariff.grace_minutes, tariff.daily_cap)
+    now = _now()
+    receipt = payments.settle_exit(db, session, now)  # raises 402 if money is still owed
+    session.exit_time = now
     session.status = CLOSED
     slot = db.get(Slot, session.slot_id)
     if slot is not None:
         slot.status = FREE
     reservations.complete_for_ticket(db, session.ticket)
     db.commit()
-    return _session_out(db, session)
+    return _session_out(db, session, receipt.receipt_no)
 
 
 @router.get("/sessions", response_model=list[SessionOut], dependencies=[Depends(staff)])
