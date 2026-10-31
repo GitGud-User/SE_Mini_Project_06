@@ -43,6 +43,16 @@
       <button type="button" id="receiptBtn" class="secondary" style="display:none">Download receipt (PDF)</button>
     </form>
   </div>
+  <form class="card" id="moveForm">
+    <h2>Move a vehicle to another slot</h2>
+    <div class="row">
+      <div><label for="mticket">Ticket</label><input id="mticket" placeholder="T-000001" required></div>
+      <div><label for="mslot">New slot</label><input id="mslot" placeholder="A-5" required></div>
+    </div>
+    <label for="mreason">Reason (saved in the audit log)</label><input id="mreason" maxlength="300" required>
+    <button type="submit" class="secondary">Move vehicle</button>
+    <div class="msg" id="moveMsg"></div>
+  </form>
   <div class="card">
     <h2>Vehicles inside</h2>
     <table><thead><tr><th>Ticket</th><th>Plate</th><th>Type</th><th>Slot</th><th>Entered (UTC)</th></tr></thead><tbody id="open"></tbody></table>
@@ -125,6 +135,19 @@ if (SPMS.requireRole(["ATTENDANT", "ADMIN"])) {
         body: JSON.stringify({ ticket: due.ticket, reason: document.getElementById("waiveReason").value }) });
       await tryExit();
     } catch (err) { SPMS.show(exitMsg, err.message, false); }
+  };
+  // ---- attendant override (F-041) ----
+  document.getElementById("moveForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("moveMsg");
+    const ticket = document.getElementById("mticket").value.trim().toUpperCase();
+    try {
+      const s = await SPMS.api(`/api/v1/gate/sessions/${encodeURIComponent(ticket)}/reassign`, { method: "POST",
+        body: JSON.stringify({ slot_code: document.getElementById("mslot").value.trim(),
+                               reason: document.getElementById("mreason").value }) });
+      SPMS.show(msg, `${s.plate} moved to slot ${s.slot_code}`, true);
+      e.target.reset(); refresh();
+    } catch (err) { SPMS.show(msg, err.message, false); }
   };
   receiptBtn.onclick = () => SPMS.download(`/api/v1/receipts/${lastReceipt}/pdf`, `${lastReceipt}.pdf`)
     .catch(err => SPMS.show(exitMsg, err.message, false));
