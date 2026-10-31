@@ -41,3 +41,30 @@ th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
 .slot { border: 1px solid var(--line); border-radius: 8px; padding: 8px; font-size: 13px; background: #fff; }
 .slot b { display: block; }
 .slot button { margin-top: 6px; padding: 4px 8px; font-size: 12px; }
+
+/* Sprint 2: driver pages, dashboard, accessibility (NF-004) */
+a { color: var(--brand); }
+:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
+label.check { display: flex; gap: 8px; align-items: center; color: var(--text); }
+label.check input { width: auto; }
+button.small { margin-top: 0; padding: 5px 10px; font-size: 13px; }
+button.danger { background: var(--bad); }
+td.actions { white-space: nowrap; }
+.table-wrap { overflow-x: auto; }
+.pill.CONFIRMED, .pill.CHECKED_IN { background: #dbeafe; color: #1e3a8a; }
+.pill.COMPLETED { background: #dcfce7; color: #14532d; }
+.pill.CANCELLED, .pill.NO_SHOW { background: #e2e8f0; color: #334155; }
+.qr { margin: 12px 0; }
+.qr img { width: 220px; max-width: 100%; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+.bar { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.bar span { display: block; width: 100%; background: var(--brand); border-radius: 3px 3px 0 0; min-height: 2px; }
+.bar small { color: var(--muted); font-size: 11px; height: 14px; }
+@media (max-width: 600px) {
+  main { margin: 16px auto; }
+  .stat .value { font-size: 24px; }
+  header { padding: 10px 16px; }
+}
+@media (max-width: 600px) {
+  .card > table { display: block; overflow-x: auto; }  /* wide tables scroll inside the card, not the page */
+}

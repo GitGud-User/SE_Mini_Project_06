@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>Occupancy &amp; revenue</h1>
+  <form class="card" id="filters">
+    <div class="row">
+      <div><label for="lot">Lot</label><select id="lot"></select></div>
+      <div><label for="from">From</label><input type="date" id="from" required></div>
+      <div><label for="to">To</label><input type="date" id="to" required></div>
+    </div>
+    <button type="submit">Show</button>
+    <button type="button" class="secondary" id="csv">Export CSV</button>
+    <div class="msg" id="msg" role="status"></div>
+  </form>
+  <div class="grid" id="kpis"></div>
+  <div class="card" style="margin-top:18px">
+    <h2>Per lot</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Lot</th><th>Entries</th><th>Occupancy</th><th>Avg stay</th><th>Revenue</th><th>Peak hours</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table></div>
+  </div>
+  <div class="card">
+    <h2>Entries by hour (UTC)</h2>
+    <div class="bars" id="bars" role="img" aria-label="Entries per hour of the day"></div>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+if (SPMS.requireRole(["ADMIN"])) {
+  SPMS.header("dashboard.html");
+  const $ = (id) => document.getElementById(id);
+  const iso = (d) => d.toISOString().slice(0, 10);
+  $("to").value = iso(new Date());
+  $("from").value = iso(new Date(Date.now() - 6 * 86400000));
+  const query = () => `date_from=${$("from").value}&date_to=${$("to").value}` + ($("lot").value ? `&lot_id=${$("lot").value}` : "");
+
+  async function load() {
+    try {
+      const s = await SPMS.api(`/api/v1/reports/summary?${query()}`);
+      const t = s.totals;
+      const stays = s.lots.filter(l => l.entries);
+      const avgStay = stays.length ? stays.reduce((a, l) => a + l.average_stay_minutes, 0) / stays.length : 0;
+      $("kpis").innerHTML = [["Revenue", `₹${t.revenue.toFixed(2)}`], ["Entries", t.entries],
+        ["Occupancy", `${t.occupancy_percent}%`], ["Avg stay", `${Math.round(avgStay)} min`], ["Refunds", `₹${t.refunds.toFixed(2)}`]]
+        .map(([k, v]) => `<div class="stat"><div class="label">${k}</div><div class="value">${SPMS.esc(v)}</div></div>`).join("");
+      $("rows").innerHTML = s.lots.map(l => `<tr><td>${SPMS.esc(l.lot_name)}</td><td>${Number(l.entries)}</td>
+        <td>${Number(l.occupancy_percent)}%</td><td>${Number(l.average_stay_minutes)} min</td><td>₹${l.revenue.toFixed(2)}</td>
+        <td>${l.peak_hours.map(h => String(h).padStart(2, "0") + ":00").join(", ") || "–"}</td></tr>`).join("");
+      const hours = Array.from({ length: 24 }, (_, h) => s.lots.reduce((a, l) => a + l.entries_by_hour[h], 0));
+      const max = Math.max(1, ...hours);
+      $("bars").innerHTML = hours.map((n, h) => `<div class="bar" title="${String(h).padStart(2, "0")}:00 – ${n} entries">
+        <span style="height:${Math.round(100 * n / max)}%"></span><small>${h % 3 === 0 ? h : ""}</small></div>`).join("");
+    } catch (err) { SPMS.show($("msg"), err.message, false); }
+  }
+  SPMS.fillLots($("lot")).then(() => {
+    $("lot").insertAdjacentHTML("afterbegin", `<option value="" selected>All lots</option>`);
+    $("lot").value = ""; load();
+  });
+  $("filters").onsubmit = (e) => { e.preventDefault(); load(); };
+  $("csv").onclick = () => SPMS.download(`/api/v1/reports/export.csv?${query()}`, `spms-report-${$("from").value}-to-${$("to").value}.csv`)
+    .catch(err => SPMS.show($("msg"), err.message, false));
+}
+</script>
+</body>
+</html>

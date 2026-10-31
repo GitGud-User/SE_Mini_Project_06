@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · Reserve a slot</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>Reserve a parking slot</h1>
+  <form class="card" id="vehicleForm" style="display:none">
+    <h2>1. Add your vehicle</h2>
+    <div class="row">
+      <div><label for="vplate">Number plate</label><input id="vplate" placeholder="KA01AB1234" required></div>
+      <div><label for="vtype">Vehicle type</label>
+        <select id="vtype"><option value="FOUR_WHEELER">Car</option><option value="TWO_WHEELER">Two-wheeler</option><option value="EV">EV</option></select></div>
+    </div>
+    <label class="check"><input type="checkbox" id="vaccess"> I need an accessible slot</label>
+    <button type="submit">Save vehicle</button>
+    <div class="msg" id="vehicleMsg" role="status"></div>
+  </form>
+
+  <form class="card" id="reserveForm" style="display:none">
+    <h2>2. Choose when and where</h2>
+    <div class="row">
+      <div><label for="vehicle">Vehicle</label><select id="vehicle"></select></div>
+      <div><label for="lot">Parking lot</label><select id="lot"></select></div>
+    </div>
+    <div class="row">
+      <div><label for="date">Date</label><input type="date" id="date" required></div>
+      <div><label for="time">Start time</label><input type="time" id="time" step="900" required></div>
+      <div><label for="duration">Duration</label>
+        <select id="duration">
+          <option value="30">30 minutes</option><option value="60">1 hour</option><option value="120" selected>2 hours</option>
+          <option value="180">3 hours</option><option value="240">4 hours</option><option value="480">8 hours</option>
+          <option value="720">12 hours</option><option value="1440">24 hours</option>
+        </select></div>
+    </div>
+    <button type="submit">Reserve &amp; pay advance</button>
+    <button type="button" class="secondary" id="addVehicle">Add another vehicle</button>
+    <div class="msg" id="reserveMsg" role="status"></div>
+  </form>
+
+  <div class="card" id="done" style="display:none">
+    <h2>3. Reserved!</h2>
+    <p id="doneText"></p>
+    <div class="qr"><img id="qrImg" alt="QR code to show at the entry gate"></div>
+    <p class="muted">Show this QR code at the entry gate within 15 minutes of the start time.
+      Cancel at least 1 hour before the start for a full refund.</p>
+    <a href="history.html">See all my reservations</a>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+if (SPMS.requireRole(["DRIVER"])) {
+  SPMS.header("reserve.html");
+  const $ = (id) => document.getElementById(id);
+  const pad = (n) => String(n).padStart(2, "0");
+  const soon = new Date(Date.now() + 30 * 60000);
+  soon.setMinutes(Math.ceil(soon.getMinutes() / 15) * 15, 0, 0);
+  $("date").value = `${soon.getFullYear()}-${pad(soon.getMonth() + 1)}-${pad(soon.getDate())}`;
+  $("time").value = `${pad(soon.getHours())}:${pad(soon.getMinutes())}`;
+
+  async function loadVehicles() {
+    const vehicles = await SPMS.api("/api/v1/vehicles");
+    $("vehicle").innerHTML = vehicles.map(v =>
+      `<option value="${Number(v.id)}">${SPMS.esc(v.plate)} (${SPMS.esc(v.vehicle_type.replace("_", " ").toLowerCase())}${v.needs_accessible ? ", accessible" : ""})</option>`).join("");
+    $("vehicleForm").style.display = vehicles.length ? "none" : "block";
+    $("reserveForm").style.display = vehicles.length ? "block" : "none";
+  }
+  SPMS.fillLots($("lot")).then(loadVehicles);
+
+  $("addVehicle").onclick = () => { $("vehicleForm").style.display = "block"; $("vplate").focus(); };
+  $("vehicleForm").onsubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await SPMS.api("/api/v1/vehicles", { method: "POST", body: JSON.stringify({
+        plate: $("vplate").value, vehicle_type: $("vtype").value, needs_accessible: $("vaccess").checked }) });
+      e.target.reset(); await loadVehicles();
+    } catch (err) { SPMS.show($("vehicleMsg"), err.message, false); }
+  };
+
+  $("reserveForm").onsubmit = async (e) => {
+    e.preventDefault();
+    const start = new Date(`${$("date").value}T${$("time").value}`);
+    const end = new Date(start.getTime() + Number($("duration").value) * 60000);
+    try {
+      const r = await SPMS.api("/api/v1/reservations", { method: "POST", body: JSON.stringify({
+        vehicle_id: Number($("vehicle").value), lot_id: Number($("lot").value),
+        start: start.toISOString(), end: end.toISOString() }) });
+      $("doneText").innerHTML = `<b>${SPMS.esc(r.code)}</b> · slot <b>${SPMS.esc(r.slot_code)}</b> · ${SPMS.esc(r.plate)}<br>
+        ${SPMS.esc(SPMS.when(r.start))} – ${SPMS.esc(SPMS.when(r.end, true))} · advance ₹${Number(r.advance_amount).toFixed(2)} paid`;
+      $("qrImg").src = await SPMS.blobUrl(`/api/v1/reservations/${encodeURIComponent(r.code)}/qr.svg`);
+      $("reserveForm").style.display = "none"; $("vehicleForm").style.display = "none";
+      $("done").style.display = "block";
+    } catch (err) { SPMS.show($("reserveMsg"), err.message, false); }
+  };
+}
+</script>
+</body>
+</html>

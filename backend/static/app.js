@@ -42,6 +42,18 @@ const SPMS = {
     const a = Object.assign(document.createElement("a"), { href: url, download: filename });
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   },
+  // API times are UTC without a "Z"; show them in the viewer's local time.
+  when(utc, timeOnly) {
+    const d = new Date(String(utc).endsWith("Z") ? utc : utc + "Z");
+    return timeOnly ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                    : d.toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  },
+  // Load an authenticated image (e.g. a QR code) and return a URL an <img> can use.
+  async blobUrl(path) {
+    const res = await fetch(path, { headers: { Authorization: "Bearer " + SPMS.token() } });
+    if (!res.ok) throw new Error("Could not load image (" + res.status + ")");
+    return URL.createObjectURL(await res.blob());
+  },
   show(el, text, ok) { el.textContent = text; el.className = "msg " + (ok ? "ok" : "err"); },
   requireRole(roles) {
     const u = SPMS.user();
@@ -51,8 +63,9 @@ const SPMS = {
   header(active) {
     const u = SPMS.user();
     const links = [["index.html", "Availability"]];
+    if (u && u.role === "DRIVER") links.push(["reserve.html", "Reserve"], ["history.html", "My history"]);
     if (u && (u.role === "ATTENDANT" || u.role === "ADMIN")) links.push(["gate.html", "Gate"]);
-    if (u && u.role === "ADMIN") links.push(["admin.html", "Admin"]);
+    if (u && u.role === "ADMIN") links.push(["admin.html", "Admin"], ["dashboard.html", "Dashboard"]);
     links.push(["/docs", "API docs"]);
     const nav = links.map(([h, t]) => `<a href="${h}" class="${h === active ? "active" : ""}">${t}</a>`).join("");
     const who = u ? `${SPMS.esc(u.name)} (${SPMS.esc(u.role)}) · <a href="#" id="logout">Log out</a>` : `<a href="login.html">Log in</a>`;
