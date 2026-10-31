@@ -29,6 +29,18 @@
       <label for="xplate">Number plate</label><input id="xplate" placeholder="KA01AB1234" required>
       <button type="submit">Log exit &amp; compute fee</button>
       <div class="msg" id="exitMsg"></div>
+      <div id="payBox" style="display:none">
+        <p id="dueText"></p>
+        <div class="row">
+          <button type="button" id="payCash">Cash received</button>
+          <button type="button" id="payOnline" class="secondary">UPI / card</button>
+        </div>
+        <div id="waiveBox" style="display:none">
+          <label for="waiveReason">Admin waiver reason</label><input id="waiveReason" maxlength="300">
+          <button type="button" id="waive" class="secondary">Waive fee</button>
+        </div>
+      </div>
+      <button type="button" id="receiptBtn" class="secondary" style="display:none">Download receipt (PDF)</button>
     </form>
   </div>
   <div class="card">
@@ -64,16 +76,58 @@ if (SPMS.requireRole(["ATTENDANT", "ADMIN"])) {
     } catch (err) { SPMS.show(msg, err.message, false); }
   };
 
-  document.getElementById("exitForm").onsubmit = async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById("exitMsg");
+  // ---- exit + payment (F-061/F-062/F-063) ----
+  const exitMsg = document.getElementById("exitMsg"), payBox = document.getElementById("payBox");
+  const receiptBtn = document.getElementById("receiptBtn");
+  let due = null, lastReceipt = null;
+  const plateInput = () => document.getElementById("xplate").value.trim();
+
+  async function tryExit() {
+    payBox.style.display = "none"; receiptBtn.style.display = "none";
     try {
-      const s = await SPMS.api("/api/v1/gate/exit", { method: "POST",
-        body: JSON.stringify({ plate: document.getElementById("xplate").value }) });
-      SPMS.show(msg, `${s.plate}: ${s.minutes} min parked · Fee ₹${s.fee.toFixed(2)}`, true);
-      e.target.reset(); refresh();
-    } catch (err) { SPMS.show(msg, err.message, false); }
+      const s = await SPMS.api("/api/v1/gate/exit", { method: "POST", body: JSON.stringify({ plate: plateInput() }) });
+      SPMS.show(exitMsg, `${s.plate}: ${s.minutes} min parked · Fee ₹${s.fee.toFixed(2)} · Receipt ${s.receipt_no}`, true);
+      lastReceipt = s.receipt_no; receiptBtn.style.display = "inline-block";
+      document.getElementById("xplate").value = ""; refresh();
+    } catch (err) {
+      if (err.status === 402) return showDue();
+      SPMS.show(exitMsg, err.message, false);
+    }
+  }
+
+  async function showDue() {
+    due = await SPMS.api(`/api/v1/payments/due?plate=${encodeURIComponent(plateInput())}`);
+    SPMS.show(exitMsg, `Payment required before exit: ₹${due.amount_due.toFixed(2)}`, false);
+    document.getElementById("dueText").textContent =
+      `Ticket ${due.ticket} · ${due.minutes} min · fee ₹${due.total_fee.toFixed(2)}` +
+      (due.advance ? ` − advance ₹${due.advance.toFixed(2)}` : "") + (due.paid ? ` − paid ₹${due.paid.toFixed(2)}` : "");
+    document.getElementById("waiveBox").style.display = (SPMS.user() || {}).role === "ADMIN" ? "block" : "none";
+    payBox.style.display = "block";
+  }
+
+  document.getElementById("exitForm").onsubmit = (e) => { e.preventDefault(); tryExit(); };
+  document.getElementById("payCash").onclick = async () => {
+    try {
+      await SPMS.api("/api/v1/payments/cash", { method: "POST", body: JSON.stringify({ ticket: due.ticket, amount: due.amount_due }) });
+      await tryExit();
+    } catch (err) { SPMS.show(exitMsg, err.message, false); }
   };
+  document.getElementById("payOnline").onclick = async () => {
+    try {
+      const order = await SPMS.api("/api/v1/payments/online/checkout", { method: "POST", body: JSON.stringify({ ticket: due.ticket }) });
+      window.open(order.checkout_url, "_blank");
+      SPMS.show(exitMsg, `Online payment of ₹${order.amount.toFixed(2)} opened in a new tab. After paying, click "Log exit" again.`, true);
+    } catch (err) { SPMS.show(exitMsg, err.message, false); }
+  };
+  document.getElementById("waive").onclick = async () => {
+    try {
+      await SPMS.api("/api/v1/payments/waive", { method: "POST",
+        body: JSON.stringify({ ticket: due.ticket, reason: document.getElementById("waiveReason").value }) });
+      await tryExit();
+    } catch (err) { SPMS.show(exitMsg, err.message, false); }
+  };
+  receiptBtn.onclick = () => SPMS.download(`/api/v1/receipts/${lastReceipt}/pdf`, `${lastReceipt}.pdf`)
+    .catch(err => SPMS.show(exitMsg, err.message, false));
 }
 </script>
 </body>
