@@ -15,7 +15,7 @@ from pydantic import BaseModel, field_validator
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, and_, or_, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from backend import auth
+from backend import auth, notifications
 from backend.auth import ADMIN, ATTENDANT, DRIVER, User, get_current_user, require_roles
 from backend.billing import compute_fee
 from backend.db import Base, get_db
@@ -300,7 +300,10 @@ def my_vehicles(db: Session = Depends(get_db), user: User = Depends(driver_only)
 @router.post("/reservations", response_model=ReservationOut, status_code=201)
 def reserve(data: ReservationIn, db: Session = Depends(get_db), user: User = Depends(driver_only)):
     """SPMS-F-030: reserve a slot. Returns the slot code, advance paid and a QR token for the gate."""
-    return reservation_out(db, create_reservation(db, user, data))
+    r = create_reservation(db, user, data)
+    notifications.reservation_confirmed(db, user, r)  # F-072
+    db.commit()
+    return reservation_out(db, r)
 
 
 @router.get("/reservations/mine", response_model=list[ReservationOut])

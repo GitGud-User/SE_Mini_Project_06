@@ -23,6 +23,7 @@ from backend.billing import compute_fee
 from backend.db import Base, get_db
 from backend.gate import OPEN, ParkingSession, _clean_plate
 from backend.lots import get_tariff
+from backend.ratelimit import rate_limit
 from backend.reservations import Reservation, Vehicle
 
 CASH, UPI, CARD, WAIVER = "CASH", "UPI", "CARD", "WAIVER"
@@ -247,7 +248,8 @@ def amount_due(plate: str, db: Session = Depends(get_db)):
     return due_for(db, s)
 
 
-@router.post("/payments/cash", response_model=PaymentOut, status_code=201)
+@router.post("/payments/cash", response_model=PaymentOut, status_code=201,
+             dependencies=[Depends(rate_limit("payment", 30))])
 def pay_cash(data: CashIn, db: Session = Depends(get_db), user: User = Depends(staff)):
     """F-061: attendant records cash received for the amount due."""
     due = due_for(db, _open_session(db, data.ticket))
@@ -262,7 +264,7 @@ def pay_cash(data: CashIn, db: Session = Depends(get_db), user: User = Depends(s
     return _p_out(p)
 
 
-@router.post("/payments/online/checkout", status_code=201)
+@router.post("/payments/online/checkout", status_code=201, dependencies=[Depends(rate_limit("payment", 30))])
 def online_checkout(data: TicketIn, db: Session = Depends(get_db), user: User = Depends(staff)):
     """F-061: start a UPI/card payment; returns the hosted checkout URL of the (mock) gateway."""
     due = due_for(db, _open_session(db, data.ticket))
@@ -275,7 +277,8 @@ def online_checkout(data: TicketIn, db: Session = Depends(get_db), user: User = 
     return {"order_id": order_id, "amount": due.amount_due, "checkout_url": f"/api/v1/payments/gateway/{order_id}"}
 
 
-@router.post("/payments/online/verify", response_model=PaymentOut)
+@router.post("/payments/online/verify", response_model=PaymentOut,
+             dependencies=[Depends(rate_limit("payment-verify", 30))])
 def online_verify(data: VerifyIn, db: Session = Depends(get_db)):
     """Gateway callback: the signature proves the payment really happened (forged ones get 400)."""
     return _p_out(_confirm(db, data.order_id, data.payment_id, data.signature))
