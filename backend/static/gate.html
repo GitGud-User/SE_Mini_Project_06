@@ -46,7 +46,7 @@ if (SPMS.requireRole(["ATTENDANT", "ADMIN"])) {
   async function refresh() {
     const rows = await SPMS.api(`/api/v1/gate/sessions?only_open=true`);
     document.getElementById("open").innerHTML = rows.map(s =>
-      `<tr><td>${s.ticket}</td><td>${s.plate}</td><td>${s.vehicle_type}</td><td>${s.slot_code}</td><td>${s.entry_time.replace("T", " ").slice(0, 16)}</td></tr>`).join("")
+      `<tr><td>${SPMS.esc(s.ticket)}</td><td>${SPMS.esc(s.plate)}</td><td>${SPMS.esc(s.vehicle_type)}</td><td>${SPMS.esc(s.slot_code)}</td><td>${SPMS.esc(s.entry_time.replace("T", " ").slice(0, 16))}</td></tr>`).join("")
       || `<tr><td colspan="5" class="muted">No vehicles inside.</td></tr>`;
   }
 

@@ -11,7 +11,7 @@ import bcrypt
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import DateTime, Integer, String, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
@@ -56,8 +56,10 @@ class RegisterIn(BaseModel):
     @classmethod
     def _name(cls, v):
         v = v.strip()
-        if len(v) < 2:
-            raise ValueError("name must have at least 2 characters")
+        if len(v) < 2 or len(v) > 100:
+            raise ValueError("name must have 2 to 100 characters")
+        if any(ch in v for ch in "<>"):  # SR-004: no markup in free text
+            raise ValueError("name must not contain < or >")
         return v
 
     @field_validator("email")
@@ -85,8 +87,8 @@ class RegisterIn(BaseModel):
 
 
 class LoginIn(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=120)
+    password: str = Field(max_length=128)
 
 
 class UserOut(BaseModel):

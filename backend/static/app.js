@@ -1,5 +1,9 @@
 // Shared helpers for every SPMS page: API calls, login token, header.
 const SPMS = {
+  // SR-004: escape anything that came from the server or a user before putting it into HTML.
+  esc(value) {
+    return String(value ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  },
   token() { try { return localStorage.getItem("spms_token"); } catch { return null; } },
   user() { try { return JSON.parse(localStorage.getItem("spms_user") || "null"); } catch { return null; } },
   saveLogin(data) {
@@ -39,14 +43,14 @@ const SPMS = {
     if (u && u.role === "ADMIN") links.push(["admin.html", "Admin"]);
     links.push(["/docs", "API docs"]);
     const nav = links.map(([h, t]) => `<a href="${h}" class="${h === active ? "active" : ""}">${t}</a>`).join("");
-    const who = u ? `${u.name} (${u.role}) · <a href="#" id="logout">Log out</a>` : `<a href="login.html">Log in</a>`;
+    const who = u ? `${SPMS.esc(u.name)} (${SPMS.esc(u.role)}) · <a href="#" id="logout">Log out</a>` : `<a href="login.html">Log in</a>`;
     document.querySelector("header").innerHTML = `<span class="brand">SPMS</span><nav>${nav}</nav><span id="who">${who}</span>`;
     const lo = document.getElementById("logout");
     if (lo) lo.onclick = (e) => { e.preventDefault(); SPMS.logout(); };
   },
   async fillLots(select) {
     const lots = await SPMS.api("/api/v1/lots");
-    select.innerHTML = lots.map(l => `<option value="${l.id}">${l.name}</option>`).join("");
+    select.innerHTML = lots.map(l => `<option value="${Number(l.id)}">${SPMS.esc(l.name)}</option>`).join("");
     return lots;
   },
 };

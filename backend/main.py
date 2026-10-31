@@ -45,6 +45,17 @@ async def lifespan(application: FastAPI):
 
 
 app = FastAPI(title="Smart Parking Management System", version="1.0.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """SR-004: basic browser hardening headers on every response."""
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
 LOADED_MODULES = load_routers(app)
 
 if STATIC_DIR.is_dir():
