@@ -62,11 +62,11 @@ if (SPMS.requireRole(["ADMIN"])) {
   async function loadLot() {
     if (!lotSel.value) { levelSel.innerHTML = ""; document.getElementById("slots").innerHTML = ""; return; }
     const levels = await SPMS.api(`/api/v1/lots/${lotSel.value}/levels`);
-    levelSel.innerHTML = levels.map(l => `<option value="${l.id}">${l.name} (floor ${l.floor_no})</option>`).join("");
+    levelSel.innerHTML = levels.map(l => `<option value="${Number(l.id)}">${SPMS.esc(l.name)} (floor ${Number(l.floor_no)})</option>`).join("");
     const slots = await SPMS.api(`/api/v1/lots/${lotSel.value}/slots`);
-    document.getElementById("slots").innerHTML = slots.map(s => `<div class="slot"><b>${s.code}</b>${s.slot_type.replace("_", " ")}<br>
-      <span class="pill ${s.status}">${s.status}</span><br>
-      <button type="button" class="secondary" data-id="${s.id}" data-m="${s.status !== "MAINTENANCE"}">${s.status === "MAINTENANCE" ? "Reopen" : "Maintenance"}</button></div>`).join("")
+    document.getElementById("slots").innerHTML = slots.map(s => `<div class="slot"><b>${SPMS.esc(s.code)}</b>${SPMS.esc(s.slot_type.replace("_", " "))}<br>
+      <span class="pill ${SPMS.esc(s.status)}">${SPMS.esc(s.status)}</span><br>
+      <button type="button" class="secondary" data-id="${Number(s.id)}" data-m="${s.status !== "MAINTENANCE"}">${s.status === "MAINTENANCE" ? "Reopen" : "Maintenance"}</button></div>`).join("")
       || `<p class="muted">No slots yet.</p>`;
   }
   lotSel.onchange = loadLot;

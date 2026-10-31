@@ -32,9 +32,9 @@ let ws = null, pollTimer = null;
 
 function render(s) {
   document.getElementById("types").innerHTML = Object.entries(s.free_by_type).map(([t, n]) =>
-    `<div class="stat"><div class="label">${LABELS[t] || t}</div><div class="value ${n === 0 ? "zero" : ""}" data-type="${t}">${n}</div></div>`).join("");
+    `<div class="stat"><div class="label">${SPMS.esc(LABELS[t] || t)}</div><div class="value ${n === 0 ? "zero" : ""}" data-type="${SPMS.esc(t)}">${Number(n)}</div></div>`).join("");
   document.getElementById("levels").innerHTML = s.levels.map(l =>
-    `<tr><td>${l.level}</td><td>${l.free}</td><td>${l.total}</td></tr>`).join("");
+    `<tr><td>${SPMS.esc(l.level)}</td><td>${Number(l.free)}</td><td>${Number(l.total)}</td></tr>`).join("");
   document.getElementById("occ").textContent = `Occupancy ${s.occupancy_percent}% · ${s.total_free} of ${s.total_slots} slots free`;
   document.getElementById("status").textContent = "Updated " + new Date().toLocaleTimeString() + (ws ? " (live)" : " (polling)");
 }

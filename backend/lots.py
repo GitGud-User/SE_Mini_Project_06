@@ -9,7 +9,8 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Boolean, Float, ForeignKey, Integer, String, UniqueConstraint, select
 from sqlalchemy.orm import Mapped, Session, mapped_column
 
-from backend.auth import ADMIN, ATTENDANT, require_roles
+from backend import audit
+from backend.auth import ADMIN, ATTENDANT, User, require_roles
 from backend.db import Base, get_db
 
 TWO_WHEELER, FOUR_WHEELER, EV, ACCESSIBLE = "TWO_WHEELER", "FOUR_WHEELER", "EV", "ACCESSIBLE"
@@ -76,13 +77,17 @@ def _check_type(v: str) -> str:
 
 class LotIn(BaseModel):
     name: str = Field(min_length=2, max_length=100)
-    address: str = ""
+    address: str = Field(default="", max_length=200)
+
+    _text = field_validator("name", "address")(classmethod(lambda cls, v: audit.no_html(v)))
 
 
 class LotPatch(BaseModel):
     name: str | None = Field(default=None, min_length=2, max_length=100)
-    address: str | None = None
+    address: str | None = Field(default=None, max_length=200)
     is_active: bool | None = None
+
+    _text = field_validator("name", "address")(classmethod(lambda cls, v: v if v is None else audit.no_html(v)))
 
 
 class LotOut(BaseModel):
@@ -96,6 +101,8 @@ class LevelIn(BaseModel):
     floor_no: int
     name: str = Field(min_length=1, max_length=50)
 
+    _text = field_validator("name")(classmethod(lambda cls, v: audit.no_html(v)))
+
 
 class LevelOut(BaseModel):
     id: int
@@ -108,7 +115,7 @@ class SlotBulkIn(BaseModel):
     level_id: int
     slot_type: str
     count: int = Field(ge=1, le=500)
-    prefix: str = Field(default="S", min_length=1, max_length=5)
+    prefix: str = Field(default="S", min_length=1, max_length=5, pattern=r"^[A-Za-z0-9]+$")
 
     _type = field_validator("slot_type")(classmethod(lambda cls, v: _check_type(v)))
 
@@ -203,12 +210,14 @@ def create_lot(data: LotIn, db: Session = Depends(get_db)):
     return _lot_out(lot)
 
 
-@router.patch("/lots/{lot_id}", response_model=LotOut, dependencies=[Depends(admin_only)])
-def update_lot(lot_id: int, data: LotPatch, db: Session = Depends(get_db)):
-    """SPMS-F-010: admin edits or deactivates a lot."""
+@router.patch("/lots/{lot_id}", response_model=LotOut)
+def update_lot(lot_id: int, data: LotPatch, db: Session = Depends(get_db), user: User = Depends(admin_only)):
+    """SPMS-F-010: admin edits or deactivates a lot (audited, SR-007)."""
     lot = get_lot_or_404(db, lot_id)
+    before = _lot_out(lot).model_dump()
     for field, value in data.model_dump(exclude_none=True).items():
         setattr(lot, field, value.strip() if isinstance(value, str) else value)
+    audit.record(db, user, "LOT_UPDATE", "LOT", lot.id, before, _lot_out(lot).model_dump())
     db.commit()
     return _lot_out(lot)
 
@@ -261,31 +270,36 @@ def list_slots(lot_id: int, db: Session = Depends(get_db)):
     return [_slot_out(s) for s in db.scalars(select(Slot).where(Slot.lot_id == lot_id).order_by(Slot.id))]
 
 
-@router.patch("/slots/{slot_id}/maintenance", response_model=SlotOut, dependencies=[Depends(staff)])
-def set_maintenance(slot_id: int, data: MaintenanceIn, db: Session = Depends(get_db)):
+@router.patch("/slots/{slot_id}/maintenance", response_model=SlotOut)
+def set_maintenance(slot_id: int, data: MaintenanceIn, db: Session = Depends(get_db), user: User = Depends(staff)):
     """SPMS-F-012: put a slot under maintenance (it is then never allocated) or bring it back."""
     slot = db.get(Slot, slot_id)
     if slot is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Slot not found")
+    before = {"status": slot.status}
     if data.under_maintenance:
         if slot.status == OCCUPIED:
             raise HTTPException(status.HTTP_409_CONFLICT, "Slot is occupied; wait until the vehicle exits")
         slot.status = MAINTENANCE
     elif slot.status == MAINTENANCE:
         slot.status = FREE
+    if slot.status != before["status"]:
+        audit.record(db, user, "SLOT_MAINTENANCE", "SLOT", slot.code, before, {"status": slot.status})
     db.commit()
     return _slot_out(slot)
 
 
-@router.put("/lots/{lot_id}/tariffs", response_model=TariffOut, dependencies=[Depends(admin_only)])
-def set_tariff(lot_id: int, data: TariffIn, db: Session = Depends(get_db)):
-    """Create or update the tariff for one vehicle type in a lot."""
+@router.put("/lots/{lot_id}/tariffs", response_model=TariffOut)
+def set_tariff(lot_id: int, data: TariffIn, db: Session = Depends(get_db), user: User = Depends(admin_only)):
+    """Create or update the tariff for one vehicle type in a lot (audited, SR-007)."""
     get_lot_or_404(db, lot_id)
+    before = get_tariff(db, lot_id, data.vehicle_type).model_dump()
     t = db.scalar(select(Tariff).where(Tariff.lot_id == lot_id, Tariff.vehicle_type == data.vehicle_type))
     if t is None:
         t = Tariff(lot_id=lot_id, vehicle_type=data.vehicle_type)
         db.add(t)
     t.hourly_rate, t.grace_minutes, t.daily_cap = data.hourly_rate, data.grace_minutes, data.daily_cap
+    audit.record(db, user, "TARIFF_CHANGE", "TARIFF", f"{lot_id}:{data.vehicle_type}", before, data.model_dump())
     db.commit()
     return get_tariff(db, lot_id, data.vehicle_type)
 
