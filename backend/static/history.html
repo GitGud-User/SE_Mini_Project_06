@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS · My history</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header></header>
+<main>
+  <h1>My reservations and parking</h1>
+  <div class="card">
+    <h2>Reservations</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Code</th><th>When</th><th>Slot</th><th>Status</th><th>Advance / refund</th><th></th></tr></thead>
+      <tbody id="res"></tbody>
+    </table></div>
+    <div class="msg" id="resMsg" role="status"></div>
+    <div class="qr" id="qrBox" style="display:none"><img id="qrImg" alt="Reservation QR code"></div>
+  </div>
+  <div class="card">
+    <h2>Parking sessions and receipts</h2>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Ticket</th><th>Plate</th><th>Entry</th><th>Exit</th><th>Fee</th><th>Receipt</th></tr></thead>
+      <tbody id="sessions"></tbody>
+    </table></div>
+  </div>
+</main>
+<script src="app.js"></script>
+<script>
+if (SPMS.requireRole(["DRIVER"])) {
+  SPMS.header("history.html");
+  const $ = (id) => document.getElementById(id);
+  let pending = null;
+
+  async function load() {
+    const h = await SPMS.api("/api/v1/me/history");
+    const now = Date.now();
+    $("res").innerHTML = h.reservations.map(r => {
+      const canCancel = r.status === "CONFIRMED" && new Date(r.start + "Z").getTime() > now;
+      const money = r.refund_amount != null ? `₹${r.advance_amount.toFixed(2)} / refunded ₹${r.refund_amount.toFixed(2)}`
+                                             : `₹${r.advance_amount.toFixed(2)}`;
+      return `<tr><td>${SPMS.esc(r.code)}</td><td>${SPMS.esc(SPMS.when(r.start))} – ${SPMS.esc(SPMS.when(r.end, true))}</td>
+        <td>${SPMS.esc(r.slot_code)}</td><td><span class="pill ${SPMS.esc(r.status)}">${SPMS.esc(r.status.replace("_", " "))}</span></td>
+        <td>${money}</td><td class="actions">${canCancel ? `<button type="button" class="small" data-qr="${SPMS.esc(r.code)}">QR</button>
+        <button type="button" class="small danger" data-cancel="${SPMS.esc(r.code)}">${pending === r.code ? "Confirm cancel" : "Cancel"}</button>` : ""}</td></tr>`;
+    }).join("") || `<tr><td colspan="6" class="muted">No reservations yet. <a href="reserve.html">Reserve a slot</a></td></tr>`;
+    $("sessions").innerHTML = h.sessions.map(s => `<tr><td>${SPMS.esc(s.ticket)}</td><td>${SPMS.esc(s.plate)}</td>
+        <td>${SPMS.esc(SPMS.when(s.entry_time))}</td><td>${s.exit_time ? SPMS.esc(SPMS.when(s.exit_time)) : "inside"}</td>
+        <td>${s.fee != null ? "₹" + s.fee.toFixed(2) : "–"}</td>
+        <td>${s.receipt_no ? `<button type="button" class="small secondary" data-receipt="${SPMS.esc(s.receipt_no)}">${SPMS.esc(s.receipt_no)} (PDF)</button>` : ""}</td></tr>`).join("")
+      || `<tr><td colspan="6" class="muted">No parking sessions yet.</td></tr>`;
+  }
+
+  document.body.addEventListener("click", async (e) => {
+    const b = e.target.closest("button");
+    if (!b) return;
+    try {
+      if (b.dataset.cancel) {
+        if (pending !== b.dataset.cancel) { pending = b.dataset.cancel; return load(); }
+        const r = await SPMS.api(`/api/v1/reservations/${encodeURIComponent(pending)}/cancel`, { method: "POST" });
+        pending = null;
+        SPMS.show($("resMsg"), `${r.code} cancelled · refund ₹${r.refund_amount.toFixed(2)}`, true);
+        $("qrBox").style.display = "none"; load();
+      } else if (b.dataset.qr) {
+        $("qrImg").src = await SPMS.blobUrl(`/api/v1/reservations/${encodeURIComponent(b.dataset.qr)}/qr.svg`);
+        $("qrBox").style.display = "block";
+      } else if (b.dataset.receipt) {
+        await SPMS.download(`/api/v1/receipts/${encodeURIComponent(b.dataset.receipt)}/pdf`, `${b.dataset.receipt}.pdf`);
+      }
+    } catch (err) { SPMS.show($("resMsg"), err.message, false); }
+  });
+  load();
+}
+</script>
+</body>
+</html>
