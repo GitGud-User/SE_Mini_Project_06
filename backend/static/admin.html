@@ -11,22 +11,22 @@
 <main>
   <h1>Admin: lots, levels and slots</h1>
   <div class="row">
-    <form class="card" id="lotForm">
+    <form class="card accent-blue" id="lotForm">
       <h2>New parking lot</h2>
       <label for="lname">Name</label><input id="lname" required>
       <label for="laddr">Address</label><input id="laddr">
       <button type="submit">Create lot</button>
-      <div class="msg" id="lotMsg"></div>
+      <div class="msg" id="lotMsg" role="status"></div>
     </form>
-    <form class="card" id="levelForm">
+    <form class="card accent-green" id="levelForm">
       <h2>Add level</h2>
       <label for="lot">Lot</label><select id="lot"></select>
       <label for="floor">Floor number</label><input id="floor" type="number" value="0" required>
       <label for="lvname">Level name</label><input id="lvname" value="Ground" required>
       <button type="submit">Add level</button>
-      <div class="msg" id="levelMsg"></div>
+      <div class="msg" id="levelMsg" role="status"></div>
     </form>
-    <form class="card" id="slotForm">
+    <form class="card accent-violet" id="slotForm">
       <h2>Add slots</h2>
       <label for="level">Level</label><select id="level"></select>
       <label for="stype">Slot type</label>
@@ -39,12 +39,12 @@
         <div><label for="prefix">Code prefix</label><input id="prefix" value="A" required></div>
       </div>
       <button type="submit">Add slots</button>
-      <div class="msg" id="slotMsg"></div>
+      <div class="msg" id="slotMsg" role="status"></div>
     </form>
   </div>
   <div class="card">
     <h2>Slots in this lot</h2>
-    <p class="muted">Click a slot's button to put it under maintenance or bring it back.</p>
+    <p class="muted">Use a slot's button to start maintenance (the slot is never allocated) or reopen it.</p>
     <div class="slots" id="slots"></div>
   </div>
 </main>
@@ -66,7 +66,7 @@ if (SPMS.requireRole(["ADMIN"])) {
     const slots = await SPMS.api(`/api/v1/lots/${lotSel.value}/slots`);
     document.getElementById("slots").innerHTML = slots.map(s => `<div class="slot"><b>${SPMS.esc(s.code)}</b>${SPMS.esc(s.slot_type.replace("_", " "))}<br>
       <span class="pill ${SPMS.esc(s.status)}">${SPMS.esc(s.status)}</span><br>
-      <button type="button" class="secondary" data-id="${Number(s.id)}" data-m="${s.status !== "MAINTENANCE"}">${s.status === "MAINTENANCE" ? "Reopen" : "Maintenance"}</button></div>`).join("")
+      <button type="button" class="secondary" data-id="${Number(s.id)}" data-m="${s.status !== "MAINTENANCE"}">${s.status === "MAINTENANCE" ? "Reopen slot" : "Start maintenance"}</button></div>`).join("")
       || `<p class="muted">No slots yet.</p>`;
   }
   lotSel.onchange = loadLot;

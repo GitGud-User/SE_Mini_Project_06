@@ -14,6 +14,7 @@
     <label for="lot">Parking lot</label>
     <select id="lot"></select>
     <p class="muted" id="status">Connecting…</p>
+    <button type="button" class="secondary" id="pause" aria-pressed="false">Pause live updates</button>
   </div>
   <div class="grid" id="types"></div>
   <div class="card" style="margin-top:18px">
@@ -31,8 +32,12 @@ const sel = document.getElementById("lot");
 let ws = null, pollTimer = null;
 
 function render(s) {
+  const before = Object.fromEntries([...document.querySelectorAll("#types .value")].map(v => [v.dataset.type, v.textContent]));
   document.getElementById("types").innerHTML = Object.entries(s.free_by_type).map(([t, n]) =>
-    `<div class="stat"><div class="label">${SPMS.esc(LABELS[t] || t)}</div><div class="value ${n === 0 ? "zero" : ""}" data-type="${SPMS.esc(t)}">${Number(n)}</div></div>`).join("");
+    `<div class="stat t-${SPMS.esc(t)}"><div class="label">${SPMS.esc(LABELS[t] || t)}</div><div class="value ${n === 0 ? "zero" : ""}" data-type="${SPMS.esc(t)}">${Number(n)}</div></div>`).join("");
+  document.querySelectorAll("#types .value").forEach(v => {
+    if (before[v.dataset.type] !== undefined && before[v.dataset.type] !== v.textContent) v.classList.add("changed");
+  });
   document.getElementById("levels").innerHTML = s.levels.map(l =>
     `<tr><td>${SPMS.esc(l.level)}</td><td>${Number(l.free)}</td><td>${Number(l.total)}</td></tr>`).join("");
   document.getElementById("occ").textContent = `Occupancy ${s.occupancy_percent}% · ${s.total_free} of ${s.total_slots} slots free`;
@@ -60,7 +65,19 @@ SPMS.fillLots(sel).then(lots => {
   if (!lots.length) { document.getElementById("empty").style.display = "block"; document.getElementById("status").textContent = ""; return; }
   watch(sel.value);
 });
-sel.onchange = () => watch(sel.value);
+sel.onchange = () => { if (!paused) watch(sel.value); };
+// WCAG 2.2.2: let people stop the automatic updates
+let paused = false;
+document.getElementById("pause").onclick = (e) => {
+  paused = !paused;
+  e.target.textContent = paused ? "Resume live updates" : "Pause live updates";
+  e.target.setAttribute("aria-pressed", String(paused));
+  if (paused) {
+    if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    clearInterval(pollTimer);
+    document.getElementById("status").textContent = "Live updates paused";
+  } else watch(sel.value);
+};
 </script>
 </body>
 </html>

@@ -11,7 +11,7 @@
 <main>
   <h1>Gate console</h1>
   <div class="row">
-    <form class="card" id="entryForm">
+    <form class="card accent-green" id="entryForm">
       <h2>Vehicle entry</h2>
       <label for="lot">Lot</label><select id="lot"></select>
       <label for="plate">Number plate</label><input id="plate" placeholder="KA01AB1234" required>
@@ -22,18 +22,18 @@
       </select>
       <label for="qr">Reservation QR (optional)</label><input id="qr">
       <button type="submit">Log entry</button>
-      <div class="msg" id="entryMsg"></div>
+      <div class="msg" id="entryMsg" role="status"></div>
     </form>
-    <form class="card" id="exitForm">
+    <form class="card accent-amber" id="exitForm">
       <h2>Vehicle exit</h2>
       <label for="xplate">Number plate</label><input id="xplate" placeholder="KA01AB1234" required>
       <button type="submit">Log exit &amp; compute fee</button>
-      <div class="msg" id="exitMsg"></div>
+      <div class="msg" id="exitMsg" role="status"></div>
       <div id="payBox" style="display:none">
         <p id="dueText"></p>
         <div class="row">
-          <button type="button" id="payCash">Cash received</button>
-          <button type="button" id="payOnline" class="secondary">UPI / card</button>
+          <button type="button" id="payCash">Record cash payment</button>
+          <button type="button" id="payOnline" class="secondary">Pay by UPI or card</button>
         </div>
         <div id="waiveBox" style="display:none">
           <label for="waiveReason">Admin waiver reason</label><input id="waiveReason" maxlength="300">
@@ -43,7 +43,7 @@
       <button type="button" id="receiptBtn" class="secondary" style="display:none">Download receipt (PDF)</button>
     </form>
   </div>
-  <form class="card" id="moveForm">
+  <form class="card accent-violet" id="moveForm">
     <h2>Move a vehicle to another slot</h2>
     <div class="row">
       <div><label for="mticket">Ticket</label><input id="mticket" placeholder="T-000001" required></div>
@@ -51,7 +51,7 @@
     </div>
     <label for="mreason">Reason (saved in the audit log)</label><input id="mreason" maxlength="300" required>
     <button type="submit" class="secondary">Move vehicle</button>
-    <div class="msg" id="moveMsg"></div>
+    <div class="msg" id="moveMsg" role="status"></div>
   </form>
   <div class="card">
     <h2>Vehicles inside</h2>

@@ -10,7 +10,7 @@
 <header></header>
 <main>
   <h1>Occupancy &amp; revenue</h1>
-  <form class="card" id="filters">
+  <form class="card accent-blue" id="filters">
     <div class="row">
       <div><label for="lot">Lot</label><select id="lot"></select></div>
       <div><label for="from">From</label><input type="date" id="from" required></div>
@@ -30,7 +30,8 @@
   </div>
   <div class="card">
     <h2>Entries by hour (UTC)</h2>
-    <div class="bars" id="bars" role="img" aria-label="Entries per hour of the day"></div>
+    <div class="bars" id="bars" aria-hidden="true"></div>
+    <table class="sr-only"><caption>Entries per hour of the day (UTC)</caption><thead><tr><th>Hour</th><th>Entries</th></tr></thead><tbody id="barsTable"></tbody></table>
   </div>
 </main>
 <script src="app.js"></script>
@@ -59,6 +60,7 @@ if (SPMS.requireRole(["ADMIN"])) {
       const max = Math.max(1, ...hours);
       $("bars").innerHTML = hours.map((n, h) => `<div class="bar" title="${String(h).padStart(2, "0")}:00 – ${n} entries">
         <span style="height:${Math.round(100 * n / max)}%"></span><small>${h % 3 === 0 ? h : ""}</small></div>`).join("");
+      $("barsTable").innerHTML = hours.map((n, h) => `<tr><td>${String(h).padStart(2, "0")}:00</td><td>${n}</td></tr>`).join("");
     } catch (err) { SPMS.show($("msg"), err.message, false); }
   }
   SPMS.fillLots($("lot")).then(() => {
