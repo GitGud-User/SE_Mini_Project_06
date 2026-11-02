@@ -81,9 +81,9 @@ class RegisterIn(BaseModel):
     def _name(cls, v):
         v = v.strip()
         if len(v) < 2 or len(v) > 100:
-            raise ValueError("name must have 2 to 100 characters")
+            raise ValueError("Enter your name (2 to 100 characters)")
         if any(ch in v for ch in "<>"):  # SR-004: no markup in free text
-            raise ValueError("name must not contain < or >")
+            raise ValueError("Use only letters, spaces and punctuation in your name (no < or >)")
         return v
 
     @field_validator("email")
@@ -91,7 +91,7 @@ class RegisterIn(BaseModel):
     def _email(cls, v):
         v = v.strip().lower()
         if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", v):
-            raise ValueError("invalid email address")
+            raise ValueError("Enter an email address like name@example.com")
         return v
 
     @field_validator("phone")
@@ -99,14 +99,14 @@ class RegisterIn(BaseModel):
     def _phone(cls, v):
         v = v.strip()
         if not re.fullmatch(r"\d{10}", v):
-            raise ValueError("phone must be 10 digits")
+            raise ValueError("Enter a 10-digit phone number, without +91 or spaces")
         return v
 
     @field_validator("password")
     @classmethod
     def _password(cls, v):
         if len(v) < 6:
-            raise ValueError("password must have at least 6 characters")
+            raise ValueError("Choose a password with at least 6 characters")
         return v
 
 

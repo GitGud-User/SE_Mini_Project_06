@@ -291,9 +291,9 @@ def gateway_page(order_id: str, db: Session = Depends(get_db)):
     if p is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Unknown order")
     state = "Already paid" if p.status == PAID else f"Pay Rs {p.amount:.2f} for ticket {p.ticket}"
-    return f"""<!doctype html><html><head><meta name=viewport content="width=device-width, initial-scale=1">
+    return f"""<!doctype html><html lang="en"><head><meta name=viewport content="width=device-width, initial-scale=1">
 <title>Mock payment gateway</title><link rel="stylesheet" href="/ui/style.css"></head><body><main>
-<div class="card"><h2>Mock payment gateway <span class="pill RESERVED">TEST MODE</span></h2>
+<div class="card"><h1>Mock payment gateway <span class="pill RESERVED">TEST MODE</span></h1>
 <p>{state}</p>
 <form method="post" action="/api/v1/payments/gateway/{order_id}/pay?method=UPI"><button>Pay with UPI</button></form>
 <form method="post" action="/api/v1/payments/gateway/{order_id}/pay?method=CARD"><button class="secondary">Pay with card</button></form>
@@ -304,8 +304,8 @@ def gateway_page(order_id: str, db: Session = Depends(get_db)):
 def gateway_pay(order_id: str, method: str = UPI, db: Session = Depends(get_db)):
     payment_id = "pay_" + secrets.token_hex(8)
     p = _confirm(db, order_id, payment_id, _sign(order_id, payment_id), method.upper())
-    return f"""<!doctype html><html><head><title>Payment successful</title><link rel="stylesheet" href="/ui/style.css">
-</head><body><main><div class="card"><h2>Payment successful</h2><p>Rs {p.amount:.2f} paid by {p.method}
+    return f"""<!doctype html><html lang="en"><head><title>Payment successful</title><link rel="stylesheet" href="/ui/style.css">
+</head><body><main><div class="card"><h1>Payment successful</h1><p>Rs {p.amount:.2f} paid by {p.method}
 for ticket {p.ticket}.</p><p class="muted">You can close this tab.</p></div></main></body></html>"""
 
 

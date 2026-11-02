@@ -12,7 +12,7 @@
   <h1>My reservations and parking</h1>
   <div class="card">
     <h2>Reservations</h2>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="stack">
       <thead><tr><th>Code</th><th>When</th><th>Slot</th><th>Status</th><th>Advance / refund</th><th></th></tr></thead>
       <tbody id="res"></tbody>
     </table></div>
@@ -21,7 +21,7 @@
   </div>
   <div class="card">
     <h2>Parking sessions and receipts</h2>
-    <div class="table-wrap"><table>
+    <div class="table-wrap"><table class="stack">
       <thead><tr><th>Ticket</th><th>Plate</th><th>Entry</th><th>Exit</th><th>Fee</th><th>Receipt</th></tr></thead>
       <tbody id="sessions"></tbody>
     </table></div>
@@ -41,15 +41,15 @@ if (SPMS.requireRole(["DRIVER"])) {
       const canCancel = r.status === "CONFIRMED" && new Date(r.start + "Z").getTime() > now;
       const money = r.refund_amount != null ? `₹${r.advance_amount.toFixed(2)} / refunded ₹${r.refund_amount.toFixed(2)}`
                                              : `₹${r.advance_amount.toFixed(2)}`;
-      return `<tr><td>${SPMS.esc(r.code)}</td><td>${SPMS.esc(SPMS.when(r.start))} – ${SPMS.esc(SPMS.when(r.end, true))}</td>
-        <td>${SPMS.esc(r.slot_code)}</td><td><span class="pill ${SPMS.esc(r.status)}">${SPMS.esc(r.status.replace("_", " "))}</span></td>
-        <td>${money}</td><td class="actions">${canCancel ? `<button type="button" class="small" data-qr="${SPMS.esc(r.code)}">QR</button>
-        <button type="button" class="small danger" data-cancel="${SPMS.esc(r.code)}">${pending === r.code ? "Confirm cancel" : "Cancel"}</button>` : ""}</td></tr>`;
+      return `<tr><td data-label="Code">${SPMS.esc(r.code)}</td><td data-label="When">${SPMS.esc(SPMS.when(r.start))} – ${SPMS.esc(SPMS.when(r.end, true))}</td>
+        <td data-label="Slot">${SPMS.esc(r.slot_code)}</td><td data-label="Status"><span class="pill ${SPMS.esc(r.status)}">${SPMS.esc(r.status.replace("_", " "))}</span></td>
+        <td data-label="Advance / refund">${money}</td><td class="actions">${canCancel ? `<button type="button" class="small" data-qr="${SPMS.esc(r.code)}">Show QR code</button>
+        <button type="button" class="small danger" data-cancel="${SPMS.esc(r.code)}">${pending === r.code ? "Yes, cancel booking" : "Cancel booking"}</button>` : ""}</td></tr>`;
     }).join("") || `<tr><td colspan="6" class="muted">No reservations yet. <a href="reserve.html">Reserve a slot</a></td></tr>`;
-    $("sessions").innerHTML = h.sessions.map(s => `<tr><td>${SPMS.esc(s.ticket)}</td><td>${SPMS.esc(s.plate)}</td>
-        <td>${SPMS.esc(SPMS.when(s.entry_time))}</td><td>${s.exit_time ? SPMS.esc(SPMS.when(s.exit_time)) : "inside"}</td>
-        <td>${s.fee != null ? "₹" + s.fee.toFixed(2) : "–"}</td>
-        <td>${s.receipt_no ? `<button type="button" class="small secondary" data-receipt="${SPMS.esc(s.receipt_no)}">${SPMS.esc(s.receipt_no)} (PDF)</button>` : ""}</td></tr>`).join("")
+    $("sessions").innerHTML = h.sessions.map(s => `<tr><td data-label="Ticket">${SPMS.esc(s.ticket)}</td><td data-label="Plate">${SPMS.esc(s.plate)}</td>
+        <td data-label="Entry">${SPMS.esc(SPMS.when(s.entry_time))}</td><td data-label="Exit">${s.exit_time ? SPMS.esc(SPMS.when(s.exit_time)) : "inside"}</td>
+        <td data-label="Fee">${s.fee != null ? "₹" + s.fee.toFixed(2) : "–"}</td>
+        <td class="actions">${s.receipt_no ? `<button type="button" class="small secondary" data-receipt="${SPMS.esc(s.receipt_no)}">${SPMS.esc(s.receipt_no)} (PDF)</button>` : ""}</td></tr>`).join("")
       || `<tr><td colspan="6" class="muted">No parking sessions yet.</td></tr>`;
   }
 

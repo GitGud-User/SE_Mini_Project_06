@@ -27,7 +27,7 @@ const SPMS = {
     try { body = await res.json(); } catch {}
     if (!res.ok) {
       let detail = body && body.detail;
-      if (Array.isArray(detail)) detail = detail.map(d => d.msg).join("; ");
+      if (Array.isArray(detail)) detail = detail.map(d => String(d.msg).replace(/^Value error, /, "")).join(". ");
       const error = new Error(detail || ("Request failed (" + res.status + ")"));
       error.status = res.status;
       throw error;
@@ -55,9 +55,27 @@ const SPMS = {
     return URL.createObjectURL(await res.blob());
   },
   show(el, text, ok) { el.textContent = text; el.className = "msg " + (ok ? "ok" : "err"); },
+  // Which pages each role may open (used by requireRole and by the login redirect).
+  PAGES: {
+    DRIVER: ["index.html", "reserve.html", "history.html"],
+    ATTENDANT: ["index.html", "gate.html"],
+    ADMIN: ["index.html", "gate.html", "admin.html", "dashboard.html"],
+  },
+  canOpen(role, path) {
+    const page = String(path || "").split("?")[0].split("/").pop();
+    return (SPMS.PAGES[role] || []).includes(page);
+  },
   requireRole(roles) {
     const u = SPMS.user();
-    if (!u || !roles.includes(u.role)) { location.href = "login.html?next=" + encodeURIComponent(location.pathname); return false; }
+    if (!u) { location.href = "login.html?next=" + encodeURIComponent(location.pathname); return false; }
+    if (!roles.includes(u.role)) {  // logged in, but this page is for another role: say so instead of looping to login
+      SPMS.header("");
+      document.querySelector("main").innerHTML = `<div class="card"><h2>Not available for your account</h2>
+        <p>This page is for ${SPMS.esc(roles.join(" / ").toLowerCase())} accounts. You are logged in as
+        <b>${SPMS.esc(u.name)}</b> (${SPMS.esc(u.role.toLowerCase())}).</p>
+        <p><a href="${SPMS.esc(SPMS.PAGES[u.role][1] || "index.html")}">Go to your start page</a> or log out and log in with another account.</p></div>`;
+      return false;
+    }
     return true;
   },
   header(active) {
@@ -69,7 +87,9 @@ const SPMS = {
     links.push(["/docs", "API docs"]);
     const nav = links.map(([h, t]) => `<a href="${h}" class="${h === active ? "active" : ""}">${t}</a>`).join("");
     const who = u ? `${SPMS.esc(u.name)} (${SPMS.esc(u.role)}) · <a href="#" id="logout">Log out</a>` : `<a href="login.html">Log in</a>`;
-    document.querySelector("header").innerHTML = `<span class="brand">SPMS</span><nav>${nav}</nav><span id="who">${who}</span>`;
+    const main = document.querySelector("main");
+    if (main && !main.id) main.id = "main";
+    document.querySelector("header").innerHTML = `<a class="skip" href="#main">Skip to content</a><span class="brand">SPMS</span><nav>${nav}</nav><span id="who">${who}</span>`;
     const lo = document.getElementById("logout");
     if (lo) lo.onclick = (e) => { e.preventDefault(); SPMS.logout(); };
   },

@@ -9,23 +9,24 @@
 <body>
 <header></header>
 <main>
+  <h1>Log in or register</h1>
   <div class="row">
-    <form class="card" id="loginForm">
+    <form class="card accent-blue" id="loginForm">
       <h2>Log in</h2>
-      <label for="email">Email</label><input id="email" type="email" required>
-      <label for="password">Password</label><input id="password" type="password" required>
+      <label for="email">Email</label><input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label><input id="password" type="password" autocomplete="current-password" required>
       <button type="submit">Log in</button>
-      <div class="msg" id="loginMsg"></div>
+      <div class="msg" id="loginMsg" role="status"></div>
       <p class="muted">Demo: admin@spms.local / admin123 · attendant@spms.local / attend123</p>
     </form>
-    <form class="card" id="regForm">
+    <form class="card accent-violet" id="regForm">
       <h2>New driver? Register</h2>
-      <label for="rname">Name</label><input id="rname" required>
-      <label for="remail">Email</label><input id="remail" type="email" required>
-      <label for="rphone">Phone (10 digits)</label><input id="rphone" required>
-      <label for="rpass">Password (min 6)</label><input id="rpass" type="password" required>
+      <label for="rname">Name</label><input id="rname" autocomplete="name" required>
+      <label for="remail">Email</label><input id="remail" type="email" autocomplete="email" required>
+      <label for="rphone">Phone (10 digits)</label><input id="rphone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="10" required>
+      <label for="rpass">Password (min 6)</label><input id="rpass" type="password" autocomplete="new-password" minlength="6" required>
       <button type="submit">Register</button>
-      <div class="msg" id="regMsg"></div>
+      <div class="msg" id="regMsg" role="status"></div>
     </form>
   </div>
 </main>
@@ -41,7 +42,8 @@ document.getElementById("loginForm").onsubmit = async (e) => {
       email: document.getElementById("email").value, password: document.getElementById("password").value }) });
     SPMS.saveLogin(data);
     const next = new URLSearchParams(location.search).get("next");
-    location.href = next || HOME[data.role] || "index.html";
+    // only go back to the requested page if this role may open it (otherwise a driver would bounce back here)
+    location.href = (next && SPMS.canOpen(data.role, next)) ? next : (HOME[data.role] || "index.html");
   } catch (err) { SPMS.show(msg, err.message, false); }
 };
 document.getElementById("regForm").onsubmit = async (e) => {
