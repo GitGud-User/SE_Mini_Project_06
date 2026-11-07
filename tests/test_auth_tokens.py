@@ -17,7 +17,7 @@ def bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_password_never_returned_and_cost_12(client):  # SR-002
+def test_password_never_returned_and_cost_12(client):  # TC-SEC-02
     body = client.post("/api/v1/auth/register", json=DRIVER).json()
     tokens = login(client).json()
     for payload in (body, tokens, client.get("/api/v1/auth/me", headers=bearer(tokens["access_token"])).json()):
@@ -25,7 +25,7 @@ def test_password_never_returned_and_cost_12(client):  # SR-002
     assert auth.DEFAULT_BCRYPT_ROUNDS >= 12
 
 
-def test_access_token_expires_in_30_minutes(client):  # SR-003
+def test_access_token_expires_in_30_minutes(client):  # TC-SEC-03
     client.post("/api/v1/auth/register", json=DRIVER)
     token = login(client).json()["access_token"]
     claims = jwt.decode(token, auth.SECRET_KEY, algorithms=[auth.ALGORITHM])
@@ -40,7 +40,7 @@ def test_access_token_expires_in_30_minutes(client):  # SR-003
     assert client.get("/api/v1/auth/admin-check", headers=bearer(forged)).status_code == 401
 
 
-def test_refresh_token_rotation(client):  # SR-003
+def test_refresh_token_rotation(client):  # TC-SEC-03
     client.post("/api/v1/auth/register", json=DRIVER)
     first = login(client).json()["refresh_token"]
     second = client.post("/api/v1/auth/refresh", json={"refresh_token": first})
@@ -51,7 +51,7 @@ def test_refresh_token_rotation(client):  # SR-003
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": new_refresh}).status_code == 401
 
 
-def test_logout_revokes_tokens(client):  # SR-003
+def test_logout_revokes_tokens(client):  # TC-SEC-03
     client.post("/api/v1/auth/register", json=DRIVER)
     tokens = login(client).json()
     headers = bearer(tokens["access_token"])
@@ -62,12 +62,12 @@ def test_logout_revokes_tokens(client):  # SR-003
     assert client.post("/api/v1/auth/refresh", json={"refresh_token": tokens["refresh_token"]}).status_code == 401
 
 
-def test_login_rate_limited(client):  # SR-006
+def test_login_rate_limited(client):  # TC-SEC-06
     codes = [login(client, "nobody@x.com", "wrong").status_code for _ in range(11)]
     assert codes[:10] == [401] * 10 and codes[10] == 429
 
 
-def test_register_rate_limited(client):  # SR-006
+def test_register_rate_limited(client):  # TC-SEC-06
     codes = [client.post("/api/v1/auth/register", json={"name": "X" * 3, "email": f"u{i}@x.com",
                                                          "phone": f"90000001{i:02d}", "password": "secret1"}).status_code
              for i in range(11)]

@@ -62,7 +62,7 @@ def test_cancel_late_refunds_half_and_frees_slot(client, driver_headers, booking
     assert again["slot_code"] == booking["slot_code"]  # released immediately
 
 
-def test_cannot_cancel_after_start_or_twice(client, driver_headers, booking, clock):
+def test_cannot_cancel_after_start_or_twice(client, driver_headers, booking, clock):  # TC-RES-03
     clock["now"] = T0 + dt.timedelta(hours=3, minutes=5)
     assert client.post(f"/api/v1/reservations/{booking['code']}/cancel", headers=driver_headers).status_code == 409
     clock["now"] = T0
@@ -83,7 +83,7 @@ def test_modify_time_recalculates_advance(client, driver_headers, booking, clock
     assert bad.status_code == 422
 
 
-def test_other_driver_cannot_change_booking(client, booking, clock):
+def test_other_driver_cannot_change_booking(client, booking, clock):  # TC-RES-03, TC-AUTH-03
     client.post("/api/v1/auth/register", json={"name": "Eve", "email": "eve@x.com", "phone": "9222222222",
                                                 "password": "secret1"})
     eve = {"Authorization": "Bearer " + client.post("/api/v1/auth/login", json={
@@ -118,7 +118,7 @@ def test_emails_for_confirm_cancel_and_reminder(client, driver_headers, admin_he
     assert [e["kind"] for e in inbox] == ["CANCELLED", "REMINDER", "CONFIRMED"]
 
 
-def test_email_goes_through_smtp_when_configured(client, monkeypatch, clock):
+def test_email_goes_through_smtp_when_configured(client, monkeypatch, clock):  # TC-NOT-01
     sent = []
 
     class FakeSMTP:  # stands in for a test SMTP inbox (e.g. MailHog)

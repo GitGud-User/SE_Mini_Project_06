@@ -31,13 +31,13 @@ def test_availability_updates_after_entry(client, lot, attendant_headers):  # TC
     assert data["free_by_type"]["FOUR_WHEELER"] == 2 and data["occupancy_percent"] == 25.0
 
 
-def test_maintenance_not_counted(client, lot, admin_headers):
+def test_maintenance_not_counted(client, lot, admin_headers):  # TC-AVL-01
     slot_id = client.get(f"/api/v1/lots/{lot['id']}/slots").json()[0]["id"]
     client.patch(f"/api/v1/slots/{slot_id}/maintenance", json={"under_maintenance": True}, headers=admin_headers)
     assert client.get(f"/api/v1/lots/{lot['id']}/availability").json()["free_by_type"]["FOUR_WHEELER"] == 2
 
 
-def test_unknown_lot_404(client):
+def test_unknown_lot_404(client):  # TC-AVL-01
     assert client.get("/api/v1/lots/999/availability").status_code == 404
 
 
@@ -49,7 +49,7 @@ def test_websocket_pushes_snapshots(client, lot, monkeypatch):  # TC-AVL-02 (liv
     assert first["total_free"] == 4 and second["lot_id"] == lot["id"]
 
 
-def test_websocket_unknown_lot(client):
+def test_websocket_unknown_lot(client):  # TC-AVL-02
     with client.websocket_connect("/ws/lots/999/availability") as ws:
         assert ws.receive_json() == {"error": "Parking lot not found"}
         with pytest.raises(WebSocketDisconnect):

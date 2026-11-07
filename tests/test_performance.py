@@ -13,7 +13,7 @@ def _lot(client, admin_headers, cars=60):
     return lot
 
 
-def test_gate_operations_within_3_seconds(client, admin_headers, attendant_headers):  # NF-002
+def test_gate_operations_within_3_seconds(client, admin_headers, attendant_headers):  # TC-PERF-02
     lot = _lot(client, admin_headers)
     timings = []
     for i in range(50):  # 50 entries + 50 exits = 100 gate operations
@@ -30,7 +30,7 @@ def test_gate_operations_within_3_seconds(client, admin_headers, attendant_heade
     assert len(timings) == 100 and max(timings) <= 3.0
 
 
-def test_api_p95_within_2_seconds(client, admin_headers, attendant_headers):  # NF-001
+def test_api_p95_within_2_seconds(client, admin_headers, attendant_headers):  # TC-PERF-01
     lot = _lot(client, admin_headers)
     urls = ["/api/v1/lots", f"/api/v1/lots/{lot['id']}/availability", f"/api/v1/lots/{lot['id']}/slots",
             "/api/v1/gate/sessions"]

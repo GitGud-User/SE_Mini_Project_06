@@ -9,17 +9,17 @@ SLOTS = [
 ]
 
 
-def test_count_free_slots_by_type():
+def test_count_free_slots_by_type():  # TC-AVL-01
     assert count_free_slots(SLOTS) == {"FOUR_WHEELER": 1, "TWO_WHEELER": 1}
 
 
-def test_maintenance_slots_not_counted_as_free():
+def test_maintenance_slots_not_counted_as_free():  # TC-AVL-01
     assert "EV" not in count_free_slots(SLOTS)
 
 
-def test_occupancy_percent_ignores_maintenance():
+def test_occupancy_percent_ignores_maintenance():  # TC-AVL-01
     assert occupancy_percent(SLOTS) == 50.0  # 2 of 4 usable slots taken
 
 
-def test_occupancy_empty_lot():
+def test_occupancy_empty_lot():  # TC-AVL-01
     assert occupancy_percent([]) == 0.0
