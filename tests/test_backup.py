@@ -10,7 +10,7 @@ def backup_folder(tmp_path, monkeypatch):
     return tmp_path / "backups"
 
 
-def test_backup_and_restore_drill(client, admin_headers, backup_folder):
+def test_backup_and_restore_drill(client, admin_headers, backup_folder):  # TC-REL-01
     client.post("/api/v1/lots", json={"name": "Keep Me"}, headers=admin_headers)
     saved = backup.backup_now()
     assert saved.exists() and saved.parent == backup_folder
@@ -20,13 +20,13 @@ def test_backup_and_restore_drill(client, admin_headers, backup_folder):
     assert names == ["Keep Me"]
 
 
-def test_only_newest_7_backups_kept(backup_folder):
+def test_only_newest_7_backups_kept(backup_folder):  # TC-REL-01
     for _ in range(9):
         backup.backup_now()
     assert len(backup.list_backups()) == 7
 
 
-def test_admin_backup_api(client, admin_headers, attendant_headers, backup_folder):
+def test_admin_backup_api(client, admin_headers, attendant_headers, backup_folder):  # TC-REL-01
     assert client.post("/api/v1/admin/backups", headers=attendant_headers).status_code == 403
     made = client.post("/api/v1/admin/backups", headers=admin_headers)
     assert made.status_code == 201 and made.json()["file"].startswith("spms-")

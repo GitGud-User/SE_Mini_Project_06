@@ -33,14 +33,14 @@ class Fields(HTMLParser):
 
 
 @pytest.mark.parametrize("page", PAGES)
-def test_page_basics(page):
+def test_page_basics(page):  # TC-UX-01
     html = (STATIC / page).read_text(encoding="utf-8")
     assert 'name="viewport" content="width=device-width, initial-scale=1"' in html
     assert '<html lang="en">' in html and "<title>" in html and "<main>" in html
 
 
 @pytest.mark.parametrize("page", PAGES)
-def test_every_field_has_a_label(page):
+def test_every_field_has_a_label(page):  # TC-UX-01
     p = Fields()
     p.feed((STATIC / page).read_text(encoding="utf-8"))
     unlabeled = [f for f in p.fields if f not in p.labels and f not in p.wrapped]
@@ -58,7 +58,7 @@ def contrast(a, b):
     return (hi + 0.05) / (lo + 0.05)
 
 
-def test_colour_contrast_wcag_aa():
+def test_colour_contrast_wcag_aa():  # TC-UX-01
     css = (STATIC / "style.css").read_text(encoding="utf-8")
     var = dict(re.findall(r"--([a-z]+):\s*(#[0-9a-fA-F]{6})", css))
     pairs = [(var["text"], var["bg"]), (var["muted"], var["card"]), (var["muted"], var["bg"]),
@@ -69,7 +69,7 @@ def test_colour_contrast_wcag_aa():
         assert contrast(fg, bg) >= 4.5, (fg, bg)
 
 
-def test_driver_can_reserve_in_few_screens(client):
+def test_driver_can_reserve_in_few_screens(client):  # TC-UX-01
     login = client.get("/ui/login.html").text
     assert 'DRIVER: "reserve.html"' in login  # 1: register/log in -> 2: reserve page
     page = client.get("/ui/reserve.html").text

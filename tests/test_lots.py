@@ -16,18 +16,18 @@ def test_admin_creates_lot_and_level(client, admin_headers):  # TC-LOT-01
     assert any(item["name"] == "Test Lot" for item in client.get("/api/v1/lots").json())
 
 
-def test_duplicate_lot_name_rejected(client, admin_headers):
+def test_duplicate_lot_name_rejected(client, admin_headers):  # TC-LOT-01
     make_lot(client, admin_headers)
     response = client.post("/api/v1/lots", json={"name": "Test Lot"}, headers=admin_headers)
     assert response.status_code == 409
 
 
-def test_driver_cannot_create_lot(client, driver_headers):  # F-003 applied to lots
+def test_driver_cannot_create_lot(client, driver_headers):  # TC-AUTH-03 · applied to lots
     response = client.post("/api/v1/lots", json={"name": "Nope"}, headers=driver_headers)
     assert response.status_code == 403
 
 
-def test_update_lot(client, admin_headers):
+def test_update_lot(client, admin_headers):  # TC-LOT-01
     lot, _ = make_lot(client, admin_headers)
     response = client.patch(f"/api/v1/lots/{lot['id']}", json={"is_active": False}, headers=admin_headers)
     assert response.json()["is_active"] is False
@@ -44,7 +44,7 @@ def test_bulk_create_slots_with_types(client, admin_headers):  # TC-LOT-02
     assert more.json()[0]["code"] == "E-4"
 
 
-def test_invalid_slot_type_rejected(client, admin_headers):
+def test_invalid_slot_type_rejected(client, admin_headers):  # TC-LOT-01
     lot, level = make_lot(client, admin_headers)
     body = {"level_id": level["id"], "slot_type": "TRUCK", "count": 1}
     assert client.post(f"/api/v1/lots/{lot['id']}/slots", json=body, headers=admin_headers).status_code == 422
@@ -66,7 +66,7 @@ def test_maintenance_slot_not_allocated(client, admin_headers, attendant_headers
     assert back.json()["status"] == "FREE"
 
 
-def test_tariff_upsert_and_default(client, admin_headers):
+def test_tariff_upsert_and_default(client, admin_headers):  # TC-LOT-02
     lot, _ = make_lot(client, admin_headers)
     body = {"vehicle_type": "FOUR_WHEELER", "hourly_rate": 50, "daily_cap": 300}
     assert client.put(f"/api/v1/lots/{lot['id']}/tariffs", json=body, headers=admin_headers).status_code == 200
@@ -75,11 +75,11 @@ def test_tariff_upsert_and_default(client, admin_headers):
     assert tariffs["EV"]["hourly_rate"] == lots.DEFAULT_HOURLY_RATE
 
 
-def test_unknown_lot_is_404(client):
+def test_unknown_lot_is_404(client):  # TC-LOT-01
     assert client.get("/api/v1/lots/999/slots").status_code == 404
 
 
-def test_seed_script_is_idempotent():
+def test_seed_script_is_idempotent():  # TC-LOT-01
     from backend import seed
     first = seed.seed()
     second = seed.seed()

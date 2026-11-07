@@ -34,7 +34,7 @@ def test_override_to_free_compatible_slot_is_audited(client, attendant_headers, 
     assert entry["reason"] == "Slot A-1 blocked by debris" and entry["role"] == "ATTENDANT"
 
 
-def test_override_rejects_bad_targets(client, attendant_headers, admin_headers, lot, ticket):
+def test_override_rejects_bad_targets(client, attendant_headers, admin_headers, lot, ticket):  # TC-ALC-02
     client.post("/api/v1/gate/entry", json={"lot_id": lot["id"], "plate": "KA02CD5678"}, headers=attendant_headers)
     assert move(client, attendant_headers, ticket, "A-2").status_code == 409   # occupied
     assert move(client, attendant_headers, ticket, "M-1").status_code == 409   # two-wheeler slot
@@ -44,5 +44,5 @@ def test_override_rejects_bad_targets(client, attendant_headers, admin_headers, 
     assert client.get("/api/v1/audit?action=ALLOCATION_OVERRIDE", headers=admin_headers).json() == []
 
 
-def test_drivers_cannot_override(client, driver_headers, ticket):
+def test_drivers_cannot_override(client, driver_headers, ticket):  # TC-ALC-02, TC-AUTH-03
     assert move(client, driver_headers, ticket, "A-3").status_code == 403

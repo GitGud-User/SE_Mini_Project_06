@@ -66,7 +66,7 @@ def test_online_payment_through_mock_gateway(client, attendant_headers, lot, clo
     assert receipt["method"] == "CARD" and receipt["amount_paid"] == 30.0
 
 
-def test_gateway_signature_is_checked(client, attendant_headers, lot, clock):
+def test_gateway_signature_is_checked(client, attendant_headers, lot, clock):  # TC-SEC-05, TC-PAY-02
     ticket = enter(client, attendant_headers, lot)["ticket"]
     clock["now"] = T0 + dt.timedelta(minutes=40)
     order_id = client.post("/api/v1/payments/online/checkout", json={"ticket": ticket},
@@ -79,7 +79,7 @@ def test_gateway_signature_is_checked(client, attendant_headers, lot, clock):
     assert leave(client, attendant_headers).status_code == 200
 
 
-def test_15_minutes_to_leave_after_paying(client, attendant_headers, lot, clock):
+def test_15_minutes_to_leave_after_paying(client, attendant_headers, lot, clock):  # TC-PAY-01
     ticket = enter(client, attendant_headers, lot)["ticket"]
     clock["now"] = T0 + dt.timedelta(minutes=55)
     client.post("/api/v1/payments/cash", json={"ticket": ticket, "amount": 30}, headers=attendant_headers)
@@ -87,7 +87,7 @@ def test_15_minutes_to_leave_after_paying(client, attendant_headers, lot, clock)
     assert leave(client, attendant_headers).status_code == 200
 
 
-def test_staying_longer_after_paying_costs_extra(client, attendant_headers, lot, clock):
+def test_staying_longer_after_paying_costs_extra(client, attendant_headers, lot, clock):  # TC-PAY-01
     ticket = enter(client, attendant_headers, lot)["ticket"]
     clock["now"] = T0 + dt.timedelta(minutes=55)
     client.post("/api/v1/payments/cash", json={"ticket": ticket, "amount": 30}, headers=attendant_headers)
@@ -109,7 +109,7 @@ def test_admin_waiver_is_audited(client, attendant_headers, admin_headers, lot, 
     assert client.get(f"/api/v1/receipts/{done['receipt_no']}", headers=admin_headers).json()["method"] == "WAIVER"
 
 
-def test_free_stay_needs_no_payment(client, attendant_headers, lot, clock):
+def test_free_stay_needs_no_payment(client, attendant_headers, lot, clock):  # TC-PAY-01, TC-GATE-04
     enter(client, attendant_headers, lot)
     clock["now"] = T0 + dt.timedelta(minutes=10)
     done = leave(client, attendant_headers)
@@ -130,14 +130,14 @@ def test_receipt_fields_and_pdf(client, attendant_headers, driver_headers, lot, 
     assert receipt_no.encode() in pdf.content and b"Rs 90.00" in pdf.content
 
 
-def test_other_driver_cannot_see_receipt(client, attendant_headers, driver_headers, lot, clock):
+def test_other_driver_cannot_see_receipt(client, attendant_headers, driver_headers, lot, clock):  # TC-PAY-03, TC-AUTH-03
     enter(client, attendant_headers, lot)
     clock["now"] = T0 + dt.timedelta(minutes=5)
     receipt_no = leave(client, attendant_headers).json()["receipt_no"]
     assert client.get(f"/api/v1/receipts/{receipt_no}", headers=driver_headers).status_code == 404
 
 
-def test_reservation_advance_is_deducted(client, attendant_headers, driver_headers, lot, clock):
+def test_reservation_advance_is_deducted(client, attendant_headers, driver_headers, lot, clock):  # TC-PAY-01, TC-RES-01
     car = client.post("/api/v1/vehicles", json={"plate": PLATE}, headers=driver_headers).json()
     start = T0 + dt.timedelta(minutes=10)
     r = client.post("/api/v1/reservations", headers=driver_headers, json={
@@ -153,6 +153,6 @@ def test_reservation_advance_is_deducted(client, attendant_headers, driver_heade
     assert receipt["advance_deducted"] == 60.0 and receipt["amount_paid"] == 0.0 and receipt["method"] == "ADVANCE"
 
 
-def test_gate_page_has_payment_panel(client):
+def test_gate_page_has_payment_panel(client):  # TC-PAY-02, TC-UX-01
     page = client.get("/ui/gate.html").text
     assert 'id="payBox"' in page and "/api/v1/payments/cash" in page and "receipts/" in page

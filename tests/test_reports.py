@@ -79,12 +79,12 @@ def test_dashboard_matches_plain_sql(client, admin_headers, day_of_data):  # TC-
     assert r["revenue"] == paid + adv - ref and r["average_stay_minutes"] == stay
 
 
-def test_other_days_are_empty(client, admin_headers, day_of_data):
+def test_other_days_are_empty(client, admin_headers, day_of_data):  # TC-RPT-01
     r = summary(client, admin_headers, date_from="2026-11-06", date_to="2026-11-06").json()["lots"][0]
     assert r["entries"] == 0 and r["revenue"] == 0
 
 
-def test_reports_admin_only_and_validated(client, attendant_headers, admin_headers, day_of_data):
+def test_reports_admin_only_and_validated(client, attendant_headers, admin_headers, day_of_data):  # TC-RPT-01, TC-AUTH-03
     assert summary(client, attendant_headers).status_code == 403
     bad = client.get("/api/v1/reports/summary?date_from=2026-11-06&date_to=2026-11-01", headers=admin_headers)
     assert bad.status_code == 422
@@ -114,7 +114,7 @@ def test_driver_history_only_own_records(client, driver_headers, day_of_data):  
     assert empty == {"vehicles": [], "reservations": [], "sessions": [], "receipts": []}
 
 
-def test_reservation_qr_image(client, driver_headers, day_of_data):
+def test_reservation_qr_image(client, driver_headers, day_of_data):  # TC-HIS-01, TC-GATE-02
     pytest.importorskip("segno")
     h = client.get("/api/v1/me/history", headers=driver_headers).json()
     active = next(r for r in h["reservations"] if r["status"] == "CONFIRMED")

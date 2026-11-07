@@ -7,7 +7,7 @@ from backend.db import SessionLocal
 from backend.volume_seed import seed_volume
 
 
-def test_volume_without_schema_changes(client, driver_headers, attendant_headers):
+def test_volume_without_schema_changes(client, driver_headers, attendant_headers):  # TC-PERF-03
     with SessionLocal() as db:
         info = seed_volume(db, lots=10, slots_per_lot=500, reservations=1000)
     assert info["slots"] == 5000 and info["reservations"] == 1000

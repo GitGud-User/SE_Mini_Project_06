@@ -20,7 +20,7 @@ def test_register_rejects_duplicate_email(client):  # TC-AUTH-01
     assert response.status_code == 409
 
 
-def test_register_validates_input(client):
+def test_register_validates_input(client):  # TC-AUTH-01
     bad = dict(NEW_DRIVER, email="not-an-email", phone="123")
     assert client.post("/api/v1/auth/register", json=bad).status_code == 422
 
@@ -40,7 +40,7 @@ def test_login_wrong_password_is_401(client):  # TC-AUTH-02
     assert response.status_code == 401
 
 
-def test_password_is_hashed_not_plain(client):  # SR-002
+def test_password_is_hashed_not_plain(client):  # TC-SEC-02
     client.post("/api/v1/auth/register", json=NEW_DRIVER)
     with SessionLocal() as db:
         user = db.query(auth.User).filter_by(email="asha@example.com").one()
@@ -53,7 +53,7 @@ def test_role_based_access(client, driver_headers, admin_headers):  # TC-AUTH-03
     assert client.get("/api/v1/auth/admin-check").status_code == 401
 
 
-def test_invalid_token_rejected(client):  # SR-003
+def test_invalid_token_rejected(client):  # TC-SEC-03
     response = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer not.a.token"})
     assert response.status_code == 401
 

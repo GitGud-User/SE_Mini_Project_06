@@ -52,7 +52,7 @@ def reserve(client, headers, lot, vehicle, start, minutes=120):
         "end": iso(start + dt.timedelta(minutes=minutes))})
 
 
-def test_register_vehicle_once(client, driver_headers):
+def test_register_vehicle_once(client, driver_headers):  # TC-RES-01
     add_vehicle(client, driver_headers)
     again = client.post("/api/v1/vehicles", headers=driver_headers, json={"plate": "KA01AB1234"})
     assert again.status_code == 409
@@ -76,12 +76,12 @@ def test_reserve_returns_slot_advance_and_qr(client, driver_headers, lot, clock)
     (dt.timedelta(hours=1), 20),       # shorter than 30 min
     (dt.timedelta(hours=1), 25 * 60),  # longer than 24 h
 ])
-def test_reservation_time_rules(client, driver_headers, lot, clock, start_offset, minutes):
+def test_reservation_time_rules(client, driver_headers, lot, clock, start_offset, minutes):  # TC-RES-01
     car = add_vehicle(client, driver_headers)
     assert reserve(client, driver_headers, lot, car, T0 + start_offset, minutes).status_code == 422
 
 
-def test_only_drivers_reserve_their_own_vehicles(client, driver_headers, attendant_headers, lot, clock):
+def test_only_drivers_reserve_their_own_vehicles(client, driver_headers, attendant_headers, lot, clock):  # TC-RES-01, TC-AUTH-03
     car = add_vehicle(client, driver_headers)
     assert reserve(client, attendant_headers, lot, car, T0 + dt.timedelta(hours=1)).status_code == 403
     client.post("/api/v1/auth/register", json={"name": "Other", "email": "o@x.com", "phone": "9111111111",
@@ -104,7 +104,7 @@ def test_overlapping_reservations_get_different_slots(client, driver_headers, lo
     assert later.json()["slot_code"] == "A-1"  # no overlap -> slot can be reused
 
 
-def test_same_vehicle_cannot_double_book(client, driver_headers, lot, clock):
+def test_same_vehicle_cannot_double_book(client, driver_headers, lot, clock):  # TC-RES-02
     car = add_vehicle(client, driver_headers)
     reserve(client, driver_headers, lot, car, T0 + dt.timedelta(hours=1))
     assert reserve(client, driver_headers, lot, car, T0 + dt.timedelta(hours=2)).status_code == 409
@@ -142,7 +142,7 @@ def test_allocation_matches_type_and_accessibility(client, driver_headers, lot, 
     assert reserve(client, driver_headers, lot, needs, start).json()["slot_code"] == "H-1"
 
 
-def test_walk_in_avoids_slot_reserved_soon(client, driver_headers, attendant_headers, lot, clock):  # F-031/F-040
+def test_walk_in_avoids_slot_reserved_soon(client, driver_headers, attendant_headers, lot, clock):  # TC-ALC-01, TC-RES-02
     car = add_vehicle(client, driver_headers)
     assert reserve(client, driver_headers, lot, car, T0 + dt.timedelta(minutes=30)).json()["slot_code"] == "A-1"
     walk_in = client.post("/api/v1/gate/entry", headers=attendant_headers,
@@ -150,7 +150,7 @@ def test_walk_in_avoids_slot_reserved_soon(client, driver_headers, attendant_hea
     assert walk_in.json()["slot_code"] == "A-2"
 
 
-def test_no_show_stops_blocking_after_15_minutes(client, driver_headers, attendant_headers, lot, clock):
+def test_no_show_stops_blocking_after_15_minutes(client, driver_headers, attendant_headers, lot, clock):  # TC-RES-04
     car = add_vehicle(client, driver_headers)
     reserve(client, driver_headers, lot, car, T0 + dt.timedelta(minutes=30))
     clock["now"] = T0 + dt.timedelta(minutes=50)  # start + 20 min, car never came
@@ -159,7 +159,7 @@ def test_no_show_stops_blocking_after_15_minutes(client, driver_headers, attenda
     assert walk_in.json()["slot_code"] == "A-1"
 
 
-def test_gate_check_in_with_reservation_qr(client, driver_headers, attendant_headers, lot, clock):
+def test_gate_check_in_with_reservation_qr(client, driver_headers, attendant_headers, lot, clock):  # TC-GATE-02
     other = add_vehicle(client, driver_headers, plate="KA05XY0001")
     reserve(client, driver_headers, lot, other, T0 + dt.timedelta(minutes=20))  # takes A-1
     car = add_vehicle(client, driver_headers)
@@ -176,7 +176,7 @@ def test_gate_check_in_with_reservation_qr(client, driver_headers, attendant_hea
     assert again.status_code == 409
 
 
-def test_qr_of_other_plate_rejected(client, driver_headers, attendant_headers, lot, clock):
+def test_qr_of_other_plate_rejected(client, driver_headers, attendant_headers, lot, clock):  # TC-GATE-02
     car = add_vehicle(client, driver_headers)
     r = reserve(client, driver_headers, lot, car, T0 + dt.timedelta(minutes=10)).json()
     entry = client.post("/api/v1/gate/entry", headers=attendant_headers,
@@ -184,7 +184,7 @@ def test_qr_of_other_plate_rejected(client, driver_headers, attendant_headers, l
     assert entry.status_code == 400
 
 
-def test_availability_counts_reserved_slots(client, driver_headers, lot, clock):
+def test_availability_counts_reserved_slots(client, driver_headers, lot, clock):  # TC-AVL-01
     before = client.get(f"/api/v1/lots/{lot['id']}/availability").json()["free_by_type"]["FOUR_WHEELER"]
     car = add_vehicle(client, driver_headers)
     reserve(client, driver_headers, lot, car, T0 + dt.timedelta(minutes=10))
