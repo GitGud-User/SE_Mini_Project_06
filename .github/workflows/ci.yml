@@ -31,5 +31,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run tests with coverage (NF-006 - must stay at or above 70%)
-        run: pytest -v --cov=backend --cov-report=term-missing --cov-fail-under=70
+      - name: Run tests with line + branch coverage (NF-006 - must stay at or above 70%)
+        run: pytest -v --cov=backend --cov-branch --cov-report=term-missing --cov-fail-under=70
