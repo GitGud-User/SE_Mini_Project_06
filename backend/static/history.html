@@ -33,18 +33,21 @@ if (SPMS.requireRole(["DRIVER"])) {
   SPMS.header("history.html");
   const $ = (id) => document.getElementById(id);
   let pending = null;
+  const QR_WINDOW_MS = 15 * 60000;  // same window the gate uses (backend/gate.py QR_WINDOW_MINUTES)
 
   async function load() {
     const h = await SPMS.api("/api/v1/me/history");
     const now = Date.now();
     $("res").innerHTML = h.reservations.map(r => {
-      const canCancel = r.status === "CONFIRMED" && new Date(r.start + "Z").getTime() > now;
+      const start = new Date(r.start + "Z").getTime();
+      const canCancel = r.status === "CONFIRMED" && start > now;                      // F-032: only before the start
+      const canShowQr = r.status === "CONFIRMED" && now < start + QR_WINDOW_MS;        // F-051: gate accepts it until start + 15 min
       const money = r.refund_amount != null ? `₹${r.advance_amount.toFixed(2)} / refunded ₹${r.refund_amount.toFixed(2)}`
                                              : `₹${r.advance_amount.toFixed(2)}`;
       return `<tr><td data-label="Code">${SPMS.esc(r.code)}</td><td data-label="When">${SPMS.esc(SPMS.when(r.start))} – ${SPMS.esc(SPMS.when(r.end, true))}</td>
         <td data-label="Slot">${SPMS.esc(r.slot_code)}</td><td data-label="Status"><span class="pill ${SPMS.esc(r.status)}">${SPMS.esc(r.status.replace("_", " "))}</span></td>
-        <td data-label="Advance / refund">${money}</td><td class="actions">${canCancel ? `<button type="button" class="small" data-qr="${SPMS.esc(r.code)}">Show QR code</button>
-        <button type="button" class="small danger" data-cancel="${SPMS.esc(r.code)}">${pending === r.code ? "Yes, cancel booking" : "Cancel booking"}</button>` : ""}</td></tr>`;
+        <td data-label="Advance / refund">${money}</td><td class="actions">${canShowQr ? `<button type="button" class="small" data-qr="${SPMS.esc(r.code)}">Show QR code</button>` : ""}
+        ${canCancel ? `<button type="button" class="small danger" data-cancel="${SPMS.esc(r.code)}">${pending === r.code ? "Yes, cancel booking" : "Cancel booking"}</button>` : ""}</td></tr>`;
     }).join("") || `<tr><td colspan="6" class="muted">No reservations yet. <a href="reserve.html">Reserve a slot</a></td></tr>`;
     $("sessions").innerHTML = h.sessions.map(s => `<tr><td data-label="Ticket">${SPMS.esc(s.ticket)}</td><td data-label="Plate">${SPMS.esc(s.plate)}</td>
         <td data-label="Entry">${SPMS.esc(SPMS.when(s.entry_time))}</td><td data-label="Exit">${s.exit_time ? SPMS.esc(SPMS.when(s.exit_time)) : "inside"}</td>
